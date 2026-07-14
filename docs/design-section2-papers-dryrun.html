@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第二节：论文选择策略与 Dry-run 计算设计</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    color: #212529;
+  }
+  h1 { border-bottom: 3px solid #0d6efd; padding-bottom: 12px; }
+  h2 { margin-top: 48px; color: #0d6efd; }
+  h3 { color: #495057; }
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 24px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 24px 0;
+    overflow: auto;
+    cursor: grab;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .mermaid:active { cursor: grabbing; }
+  .mermaid svg {
+    max-width: none !important;
+    height: auto !important;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #e9ecef; font-weight: 600; }
+  .paper-card {
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    background: #fcfcfc;
+  }
+  .paper-card h3 {
+    margin-top: 0;
+    color: #0d6efd;
+    font-size: 16px;
+  }
+  .paper-card .paper-search {
+    font-size: 13px;
+    color: #6c757d;
+    margin: 4px 0 12px 0;
+    font-family: monospace;
+    background: #f0f0f0;
+    padding: 4px 10px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .tag-review { background: #e0e7ff; color: #3730a3; }
+  .tag-method { background: #d1fae5; color: #065f46; }
+  .tag-disease { background: #fee2e2; color: #991b1b; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-green { background: #d1e7dd; color: #0f5132; }
+  .badge-yellow { background: #fff3cd; color: #664d03; }
+  .badge-red { background: #f8d7da; color: #842029; }
+  .badge-blue { background: #cfe2ff; color: #084298; }
+  .badge-new { background: #cff4fc; color: #055160; }
+  .decision-card {
+    border-left: 4px solid #0d6efd;
+    background: #f0f7ff;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .risk-card {
+    border-left: 4px solid #dc3545;
+    background: #fff5f5;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .info-card {
+    border-left: 4px solid #198754;
+    background: #f0fff4;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .code-block {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  .code-block .kw { color: #569cd6; }
+  .code-block .str { color: #ce9178; }
+  .code-block .num { color: #b5cea8; }
+  .code-block .cmt { color: #6a9955; }
+  .code-block .chg { color: #f5a623; }
+  .result-row {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .result-card {
+    flex: 1;
+    min-width: 200px;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .result-pass { background: #d1e7dd; border: 1px solid #a3cfbb; }
+  .result-fail1 { background: #fff3cd; border: 1px solid #ffc107; }
+  .result-fail2 { background: #f8d7da; border: 1px solid #f1aeb5; }
+  .result-fail3 { background: #e2e3e5; border: 1px solid #ced4da; }
+  .changelog {
+    background: #fff9e6;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .changelog h3 { margin-top: 0; color: #856404; }
+  .zoom-hint {
+    text-align: center;
+    color: #6c757d;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🧪 第二节：论文选择策略与 Dry-run 计算设计 <span class="badge badge-new" style="font-size:14px">更新于 7/15</span></h1>
+
+<!-- Changelog -->
+<div class="changelog">
+  <h3>📝 变更记录（7/15）</h3>
+  <table style="margin:0">
+    <tr><th style="white-space:nowrap">变更</th><th>旧</th><th>新</th><th>原因</th></tr>
+    <tr>
+      <td style="white-space:nowrap">PDF 解析</td>
+      <td>LLM 截图解析为主 + PyMuPDF fallback</td>
+      <td><strong>PyMuPDF (fitz) 文本提取</strong></td>
+      <td>DeepSeek V4 不支持视觉输入</td>
+    </tr>
+    <tr>
+      <td style="white-space:nowrap">论文时效</td>
+      <td>不限年份，包含 1998、2006 等经典</td>
+      <td><strong>2023-2026 优先</strong>（硬约束）</td>
+      <td>考核文献调研要求展示检索策略和时效性</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 0. PDF Input -->
+<div class="section">
+<h2>1. PDF 输入方案 <span class="badge badge-new" style="font-size:12px">更新</span></h2>
+
+<h3>主方案：PyMuPDF (fitz)</h3>
+
+<div class="mermaid">
+flowchart LR
+    A["📄 PDF 文件"] --> B["PyMuPDF<br/>fitz.open()"]
+    B --> C["逐页提取文本<br/>page.get_text('blocks')"]
+    C --> D["保留段落结构<br/>+ 页码标注"]
+    D --> E["ParsedPaper<br/>Pydantic 对象"]
+    E --> F["进入 Extract 阶段"]
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<table>
+  <tr><th>优势</th><th>说明</th></tr>
+  <tr><td>零 API 成本</td><td>不消耗 DeepSeek 额度，100 元全部用于核心 Agent 任务</td></tr>
+  <tr><td>确定性行为</td><td>同一 PDF 每次提取结果一致，不引入 LLM 随机性</td></tr>
+  <tr><td>原生页码</td><td><code>page.number</code> 直接获取页码，provenance 精确定位</td></tr>
+  <tr><td>段落结构</td><td>按 blocks 提取，保留大致阅读顺序</td></tr>
+</table>
+
+<h3>已知限制（不设为必达目标）</h3>
+
+<div class="risk-card">
+  <ul style="margin:0">
+    <li>图表内容不提取（仅记录位置：<code>Figure 3 at page 5</code>）</li>
+    <li>复杂排版（三栏、大量浮动元素）段落顺序可能错乱 → 人工确认 5 篇均为单/双栏 PDF</li>
+    <li>数学公式提取不完整 → LLM 在 Extract 阶段根据上下文推断公式语义</li>
+  </ul>
+</div>
+
+<h3>工具接口</h3>
+<div class="code-block">
+<span class="cmt"># tools/pdf_parser.py</span>
+<span class="kw">def</span> <span class="str">parse_pdf</span>(file_path: <span class="kw">str</span>) -> <span class="str">ParsedPaper</span>:
+    <span class="cmt">"""返回带页码标注的结构化文本"""</span>
+    <span class="kw">return</span> ParsedPaper(
+        pages=[
+            Page(number=<span class="num">1</span>, text=<span class="str">"..."</span>),
+            Page(number=<span class="num">2</span>, text=<span class="str">"..."</span>),
+        ],
+        metadata={...}
+    )
+</div>
+</div>
+
+<!-- 1. Selection Criteria -->
+<div class="section">
+<h2>2. 论文选题标准 <span class="badge badge-new" style="font-size:12px">更新</span></h2>
+
+<table>
+  <tr><th>#</th><th>约束</th><th>类型</th><th>说明</th></tr>
+  <tr>
+    <td>C1</td>
+    <td><strong>时效性</strong> <span class="badge badge-new">新增</span></td>
+    <td><span class="badge badge-red">硬</span></td>
+    <td>优先 2023-2026 年发表；如某子主题无近期论文，允许 1 篇 2020+ 经典</td>
+  </tr>
+  <tr>
+    <td>C2</td>
+    <td>包含<strong>定量数据</strong></td>
+    <td><span class="badge badge-red">硬</span></td>
+    <td>每篇至少有 1-2 个可提取的数值：α、λ、D*、清除率、浓度变化</td>
+  </tr>
+  <tr>
+    <td>C3</td>
+    <td>覆盖 <strong>ECS 学习目标</strong></td>
+    <td><span class="badge badge-red">硬</span></td>
+    <td>5 篇分散在不同子主题，不重复覆盖同一知识点</td>
+  </tr>
+  <tr>
+    <td>C4</td>
+    <td><strong>可获取全文 PDF</strong></td>
+    <td><span class="badge badge-red">硬</span></td>
+    <td>开源优先，机构订阅其次；7 天内能下载</td>
+  </tr>
+  <tr>
+    <td>C5</td>
+    <td>多样性</td>
+    <td><span class="badge badge-yellow">软</span></td>
+    <td>综述 1 + 方法学 2 + 疾病关联 2</td>
+  </tr>
+  <tr>
+    <td>C6</td>
+    <td>权威性</td>
+    <td><span class="badge badge-yellow">软</span></td>
+    <td>PubMed 索引、有 DOI、优先高引用期刊</td>
+  </tr>
+</table>
+</div>
+
+<!-- 2. Search Strategy -->
+<div class="section">
+<h2>3. 检索策略（文献调研报告素材）</h2>
+
+<div class="mermaid">
+flowchart TD
+    S0["🎯 确定检索平台<br/>PubMed, Google Scholar"]
+    S1["🔍 输入关键词<br/>5 组 × 3 组同义词"]
+    S2["📅 限定时间范围<br/>2023-01-01 ~ 2026-07-15"]
+    S3["📋 标题筛选<br/>每类 10-15 篇"]
+    S4["📝 摘要筛选<br/>确认含定量数据<br/>每类 3-5 篇"]
+    S5["📄 全文获取<br/>每类 1-3 篇"]
+    S6["✅ 最终确定<br/>每类 1 篇"]
+
+    S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<table>
+  <tr><th>类别</th><th>PubMed 检索词</th><th>预期命中</th></tr>
+  <tr>
+    <td>综述</td>
+    <td style="font-family:monospace;font-size:13px">("extracellular space"[Title/Abstract] AND "brain"[Title/Abstract]) AND ("review"[Publication Type] OR "volume fraction"[Text Word] OR "tortuosity"[Text Word]) AND ("2023"[Date - Publication] : "2026"[Date - Publication])</td>
+    <td>10-15 → 3-5 → 1</td>
+  </tr>
+  <tr>
+    <td>方法学 1</td>
+    <td style="font-family:monospace;font-size:13px">("extracellular space"[Title/Abstract] AND "brain"[Title/Abstract]) AND ("iontophoresis"[Text Word] OR "diffusion measurement"[Text Word] OR "integrative optical imaging"[Text Word]) AND ("2023"[Date - Publication] : "2026"[Date - Publication])</td>
+    <td>5-10 → 2-4 → 1</td>
+  </tr>
+  <tr>
+    <td>方法学 2</td>
+    <td style="font-family:monospace;font-size:13px">("brain extracellular space"[Title/Abstract]) AND ("imaging"[Text Word] OR "microscopy"[Text Word] OR "super-resolution"[Text Word] OR "tracer"[Text Word]) AND ("2023"[Date - Publication] : "2026"[Date - Publication])</td>
+    <td>10-15 → 3-5 → 1</td>
+  </tr>
+  <tr>
+    <td>疾病关联</td>
+    <td style="font-family:monospace;font-size:13px">("extracellular space"[Title/Abstract] AND "brain"[Title/Abstract]) AND ("ischemia"[Text Word] OR "edema"[Text Word] OR "stroke"[Text Word]) AND ("2023"[Date - Publication] : "2026"[Date - Publication])</td>
+    <td>10-15 → 3-5 → 1</td>
+  </tr>
+  <tr>
+    <td>清除/递送</td>
+    <td style="font-family:monospace;font-size:13px">("glymphatic"[Title/Abstract] OR "perivascular transport"[Title/Abstract] OR "brain clearance"[Title/Abstract]) AND ("2023"[Date - Publication] : "2026"[Date - Publication])</td>
+    <td>15-20 → 4-6 → 1</td>
+  </tr>
+</table>
+
+<div class="info-card">
+  <strong>💡 文献调研报告可直接引用：</strong>以上检索策略、命中数量和筛选流程就是考核要求的"检索平台、关键词、时间范围和筛选方法"章节的核心内容。
+</div>
+</div>
+
+<!-- 3. Five Papers -->
+<div class="section">
+<h2>4. 5 篇候选论文（确认中）</h2>
+
+<p>以下为每类论文的详细需求和计算验证设计。具体 DOI 由 deep-research agent 搜索后确定。</p>
+
+<div class="paper-card">
+  <span class="tag tag-review">综述</span>
+  <h3>论文 1：ECS 结构与生理参数综述</h3>
+  <div class="paper-search">搜索词：brain extracellular space review volume fraction tortuosity 2023-2025</div><br/>
+  <strong>预期来源：</strong>Physiological Reviews / Nature Reviews Neuroscience / Trends in Neurosciences<br/>
+  <strong>覆盖目标：</strong>ECS 定义、α 概念、λ 概念、测量方法总览<br/>
+  <strong>定量要求：</strong>包含 α 和 λ 在不同脑区的典型值表<br/>
+  <strong>计算验证：</strong>λ = √(D/D*) 定义式；α 在不同脑区的对比
+
+  <div class="code-block">
+<span class="cmt"># Dry-run 示例</span>
+<span class="kw">input:</span>  D_free = <span class="num">7.6e-6</span> cm²/s,  λ_reported = <span class="num">1.6</span>
+<span class="kw">calc:</span>  D_star = D_free / λ² = <span class="num">7.6e-6</span> / <span class="num">2.56</span> = <span class="num">2.97e-6</span> cm²/s
+<span class="kw">paper:</span> D*_reported ≈ <span class="num">2.9e-6</span>
+<span class="kw">result:</span> |<span class="num">2.97</span> - <span class="num">2.9</span>| / <span class="num">2.9</span> = <span class="num">2.4%</span> → <span style="color:#4caf50">✓ PASS</span>
+  </div>
+</div>
+
+<div class="paper-card">
+  <span class="tag tag-method">方法学</span>
+  <h3>论文 2：ECS 扩散参数测量方法</h3>
+  <div class="paper-search">搜索词：ECS diffusion measurement iontophoresis integrative optical imaging 2023-2024</div><br/>
+  <strong>预期来源：</strong>Journal of Neuroscience Methods / NeuroImage / eLife<br/>
+  <strong>覆盖目标：</strong>ECS 测量方法、示踪剂、扩散方程应用<br/>
+  <strong>定量要求：</strong>包含浓度-时间数据或可拟合的扩散参数<br/>
+  <strong>计算验证：</strong>扩散方程拟合；α 和 λ 的交叉验证
+
+  <div class="code-block">
+<span class="cmt"># Dry-run 示例：扩散方程拟合</span>
+<span class="kw">model:</span>  C(t) = (Q/α)·(4πD*t)^(-<span class="num">3</span>/<span class="num">2</span>)·exp(-r²/<span class="num">4</span>D*t - k't)
+<span class="kw">input:</span>  浓度-时间数据点（从论文表格提取）
+<span class="kw">fit:</span>   最小二乘法拟合 → α_fitted, λ_fitted
+<span class="kw">check:</span> α_fitted vs α_reported, λ_fitted vs λ_reported
+  </div>
+</div>
+
+<div class="paper-card">
+  <span class="tag tag-method">方法学/成像</span>
+  <h3>论文 3：ECS 结构成像与示踪剂扩散</h3>
+  <div class="paper-search">搜索词：brain ECS imaging super-resolution microscopy tracer diffusion 2023-2025</div><br/>
+  <strong>预期来源：</strong>Nature Communications / Science Advances / eLife<br/>
+  <strong>覆盖目标：</strong>ECS 成像方法、示踪剂尺寸与扩散关系<br/>
+  <strong>定量要求：</strong>包含扩散系数或 tracer 分布数据<br/>
+  <strong>计算验证：</strong>Stokes-Einstein 方程；示踪剂半径 vs 扩散系数
+
+  <div class="code-block">
+<span class="cmt"># Dry-run 示例</span>
+<span class="kw">input:</span>  T = <span class="num">310</span> K,  η = <span class="num">0.001</span> Pa·s,  r = <span class="num">10</span> nm
+<span class="kw">calc:</span>  D_pred = kT / (6π η r)
+         = (<span class="num">1.38e-23</span> × <span class="num">310</span>) / (<span class="num">6</span> × π × <span class="num">0.001</span> × <span class="num">1e-8</span>)
+         = <span class="num">2.27e-11</span> m²/s
+<span class="kw">paper:</span> ECS 中实测 D_eff ≈ <span class="num">2.0e-12</span> m²/s
+<span class="kw">result:</span> D_eff << D_pred → ECS 几何约束显著 ✓
+  </div>
+</div>
+
+<div class="paper-card">
+  <span class="tag tag-disease">疾病关联</span>
+  <h3>论文 4：脑水肿/缺血状态下 ECS α 的动态变化</h3>
+  <div class="paper-search">搜索词：brain extracellular space ischemia edema volume fraction 2023-2025</div><br/>
+  <strong>预期来源：</strong>Stroke / JCBFM / Brain<br/>
+  <strong>覆盖目标：</strong>ECS 与脑水肿、脑缺血的病理关联<br/>
+  <strong>定量要求：</strong>包含正常 vs 病理状态的 α 或扩散参数对比<br/>
+  <strong>计算验证：</strong>扩散时间在不同 α 下的变化
+
+  <div class="code-block">
+<span class="cmt"># Dry-run 示例：扩散时间对比</span>
+<span class="kw">input:</span>  扩散距离 x = <span class="num">100</span> μm,  D*_normal = <span class="num">2.0e-6</span> cm²/s
+<span class="kw">calc:</span>  t_normal = x² / (<span class="num">2</span> × D*) = <span class="num">25</span> s
+         D*_ischemia ≈ D*_normal / <span class="num">3</span>（α 崩塌导致）
+         t_ischemia = <span class="num">75</span> s
+<span class="kw">result:</span> 扩散延迟 <span class="num">3</span> 倍 → 与论文描述的"slowing"一致 ✓
+  </div>
+</div>
+
+<div class="paper-card">
+  <span class="tag tag-disease">清除/递送</span>
+  <h3>论文 5：类淋巴系统与 ECS 脑内清除</h3>
+  <div class="paper-search">搜索词：glymphatic brain clearance perivascular transport drug delivery 2023-2025</div><br/>
+  <strong>预期来源：</strong>Science / Nature / Nature Neuroscience / Cell<br/>
+  <strong>覆盖目标：</strong>ECS 与脑内清除、药物递送<br/>
+  <strong>定量要求：</strong>包含清除率、半衰期或 Péclet 参数<br/>
+  <strong>计算验证：</strong>Péclet 数判断对流 vs 扩散主导
+
+  <div class="code-block">
+<span class="cmt"># Dry-run 示例：Péclet 数判断</span>
+<span class="kw">input:</span>  D* = <span class="num">5e-7</span> cm²/s,  v = <span class="num">10</span> μm/min,  L = <span class="num">100</span> μm
+<span class="kw">calc:</span>  Pe = v·L / D*
+         = (<span class="num">10e-4</span> × <span class="num">0.01</span>) / (<span class="num">5e-7</span> × <span class="num">60</span>)
+         = <span class="num">0.33</span>
+<span class="kw">result:</span> Pe &lt; <span class="num">1</span> → 扩散主导清除 ✓
+  </div>
+</div>
+</div>
+
+<!-- 4. Coverage Matrix -->
+<div class="section">
+<h2>5. 学习目标覆盖矩阵</h2>
+
+<table>
+  <tr><th>学习目标</th><th style="text-align:center">综述<br/><small>论文1</small></th><th style="text-align:center">方法学<br/><small>论文2</small></th><th style="text-align:center">成像<br/><small>论文3</small></th><th style="text-align:center">水肿<br/><small>论文4</small></th><th style="text-align:center">清除<br/><small>论文5</small></th></tr>
+  <tr><td>ECS 定义与组成</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center;color:#6c757d">○</td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center"></td></tr>
+  <tr><td>α（体积分数）</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center"></td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center"></td></tr>
+  <tr><td>λ（迂曲度）</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center"></td></tr>
+  <tr><td>扩散与物质运输</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center"></td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td></tr>
+  <tr><td>测量/示踪/成像</td><td style="text-align:center"></td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center"></td><td style="text-align:center"></td></tr>
+  <tr><td>脑水肿/缺血</td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td><td style="text-align:center"></td></tr>
+  <tr><td>药物递送/清除</td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center"></td><td style="text-align:center;color:#0d6efd;font-weight:bold">●</td></tr>
+</table>
+<div style="font-size:13px;color:#6c757d;margin-top:8px">● 主题核心 &nbsp;&nbsp; ○ 相关内容</div>
+</div>
+
+<!-- 5. Dry-run Sandbox -->
+<div class="section">
+<h2>6. Dry-run 沙箱设计</h2>
+
+<h3>安全边界</h3>
+
+<div class="mermaid">
+flowchart TB
+    subgraph ALLOW["✅ 白名单：允许的操作"]
+        A1["算术运算 + - * / **"]
+        A2["math 模块 sqrt, exp, log, sin, cos, pi"]
+        A3["numpy 基础 mean, std, sum, array, linspace"]
+    end
+
+    subgraph BLOCK["🚫 黑名单：禁止的操作"]
+        B1["文件读写 open, read, write"]
+        B2["网络请求 requests, urllib, socket"]
+        B3["系统调用 os, sys, subprocess"]
+        B4["未授权模块导入"]
+        B5["嵌套 eval / exec"]
+    end
+
+    subgraph LIMITS["⏱️ 强制限制"]
+        L1["超时 5 秒"]
+        L2["内存 100 MB"]
+        L3["输出 10 KB"]
+    end
+
+    ALLOW -.->|"隔离执行"| LIMITS
+    BLOCK -.->|"拦截报错"| LIMITS
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>执行流程（4 步）</h3>
+
+<div class="mermaid">
+flowchart TD
+    INPUT["📥 数值声明（从 Extract 阶段来）<br/>──<br/>formula: 'λ² = D/D*'<br/>params: D=7.6e-6, D*=2.9e-6<br/>reported: 1.62"]
+
+    STEP1["🔤 步骤 1：公式解析<br/>LLM 将自然语言公式<br/>转为 Python 表达式<br/>──<br/>'λ = √(D/D*)'<br/>→ 'sqrt(D / D_star)'"]
+
+    STEP2["📎 步骤 2：参数绑定<br/>论文参数名映射到<br/>Python 变量<br/>──<br/>D=7.6e-6, D_star=2.9e-6"]
+
+    STEP3["⚡ 步骤 3：安全执行<br/>在白名单沙箱中<br/>exec(python_expr)<br/>──<br/>result = sqrt(7.6e-6 / 2.9e-6)<br/>= 1.618..."]
+
+    STEP4["📊 步骤 4：结果对比<br/>容差 5%<br/>──<br/>|1.618 - 1.62| = 0.002<br/>0.12% < 5% → ✓ MATCH"]
+
+    INPUT --> STEP1 --> STEP2 --> STEP3 --> STEP4
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>四种 Dry-run 结果</h3>
+
+<div class="result-row">
+  <div class="result-card result-pass">
+    <strong style="font-size:18px">✓ passed</strong><br/>
+    <small>计算值与论文报告值<br/>在 5% 容差内一致</small><br/>
+    <span class="badge badge-green">成功案例</span>
+  </div>
+  <div class="result-card result-fail1">
+    <strong style="font-size:18px">⚠ mismatch</strong><br/>
+    <small>计算值与论文报告值<br/>偏离超过 5% 容差</small><br/>
+    <span class="badge badge-yellow">失败案例 1</span>
+  </div>
+  <div class="result-card result-fail2">
+    <strong style="font-size:18px">❓ insufficient_data</strong><br/>
+    <small>论文声明了结论<br/>但缺少计算所需参数</small><br/>
+    <span class="badge badge-red">失败案例 2<br/>→ review_required</span>
+  </div>
+  <div class="result-card result-fail3">
+    <strong style="font-size:18px">✗ calculation_error</strong><br/>
+    <small>公式无法解析<br/>或执行时出错</small><br/>
+    <span class="badge badge-blue">失败案例 3</span>
+  </div>
+</div>
+</div>
+
+<!-- 6. Case Scripts -->
+<div class="section">
+<h2>7. 案例演示脚本</h2>
+
+<h3>✅ 成功案例</h3>
+<div class="decision-card">
+  <strong>场景：</strong>综述论文，验证 λ = √(D/D*) 关系
+</div>
+<div class="code-block">
+<span class="cmt">## 论文原文段落</span>
+<span class="str">"In the cortex, the tortuosity λ was found to be approximately
+1.6, with D = 7.6×10⁻⁶ cm²/s in free medium and D* ≈
+2.9×10⁻⁶ cm²/s in the extracellular space."</span>
+
+<span class="cmt">## Agent 行为</span>
+<span class="num">1.</span> Extract → claim <span class="str">"皮层 λ ≈ 1.6 (D=7.6e-6, D*=2.9e-6 cm²/s)"</span>
+<span class="num">2.</span> Compute → 识别公式 λ = √(D/D*)
+<span class="num">3.</span> Dry-run → sqrt(<span class="num">7.6e-6</span> / <span class="num">2.9e-6</span>) = <span class="num">1.618</span>
+<span class="num">4.</span> Compare → |1.618 - 1.6| / 1.6 = 1.1% < 5% → <span style="color:#4caf50">passed</span>
+
+<span class="cmt">## 演示台词</span>
+<span class="str">"Agent 不仅提取了结论，还自动识别了其中隐含的计算关系，
+用代码验证了论文数据的一致性——误差仅 1.1%。"</span>
+</div>
+
+<h3>❌ 失败案例</h3>
+<div class="risk-card">
+  <strong>场景：</strong>疾病论文，声明了 α 的相对变化但缺少绝对参数
+</div>
+<div class="code-block">
+<span class="cmt">## 论文原文段落</span>
+<span class="str">"Following the induction of ischemia, the extracellular volume
+fraction decreased significantly, reaching approximately 30%
+of its baseline value within 5 minutes."</span>
+
+<span class="cmt">## Agent 行为</span>
+<span class="num">1.</span> Extract → claim <span class="str">"缺血后 α 降至基线的约 30%"</span>
+<span class="num">2.</span> Compute → 尝试 dry-run：
+   需要参数：baseline_α, ischemia_α, time_course
+   可获取：仅 relative_change=<span class="num">30%</span>，无绝对值
+<span class="num">3.</span> 结果 → <span style="color:#dc3545">insufficient_data</span>
+   → review_required: <span class="str">"缺少基线 α 绝对值和完整时间序列"</span>
+
+<span class="cmt">## 演示台词</span>
+<span class="str">"Agent 识别出论文提出了定量结论但缺少验证所需的参数，
+正确地标记了 review_required 而非编造数据。
+这就是 ARM 的核心价值——区分'论文说了什么'和'我们能验证什么'。"</span>
+</div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+  });
+  document.querySelectorAll('.mermaid').forEach(el => {
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      const svg = el.querySelector('svg');
+      if (!svg) return;
+      const scale = parseFloat(svg.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || 1);
+      const newScale = Math.max(0.3, Math.min(3, scale + (e.deltaY > 0 ? -0.1 : 0.1)));
+      svg.style.transform = `scale(${newScale})`;
+      svg.style.transformOrigin = 'top left';
+    });
+  });
+</script>
+
+</body>
+</html>

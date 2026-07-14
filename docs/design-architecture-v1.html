@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECS Paper-to-ARM — 架构设计</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    color: #212529;
+  }
+  h1 { border-bottom: 3px solid #0d6efd; padding-bottom: 12px; }
+  h2 { margin-top: 48px; color: #0d6efd; }
+  h3 { color: #495057; }
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 24px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 24px 0;
+    overflow: auto;
+    cursor: grab;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .mermaid:active { cursor: grabbing; }
+  .mermaid svg {
+    max-width: none !important;
+    height: auto !important;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  th { background: #e9ecef; font-weight: 600; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  .decision-card {
+    border-left: 4px solid #0d6efd;
+    background: #f0f7ff;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .decision-card strong { color: #0d6efd; }
+  .zoom-hint {
+    text-align: center;
+    color: #6c757d;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-green { background: #d1e7dd; color: #0f5132; }
+  .badge-yellow { background: #fff3cd; color: #664d03; }
+  .badge-red { background: #f8d7da; color: #842029; }
+</style>
+</head>
+<body>
+
+<h1>🧠 ECS Paper-to-ARM Agent — 架构设计 v1</h1>
+
+<!-- Section 1: Architecture -->
+<div class="section">
+<h2>1. 整体分层架构</h2>
+<p>系统分为 <strong>5 层</strong>，自上而下：UI → Orchestrator → Pipeline（5 阶段）→ Tools（4 工具）→ Schema。</p>
+
+<div class="mermaid">
+flowchart TB
+    subgraph UI["🖥️ Streamlit Web UI"]
+        U1["📤 上传 PDF"] ~~~ U2["📊 查看处理进度"]
+        U3["📋 浏览 ARM 结构化结果"] ~~~ U4["💾 下载 YAML/JSON"] ~~~ U5["📜 查看运行日志"]
+    end
+
+    subgraph ORCH["🎯 Orchestrator（主控）"]
+        O1["按序调用 5 个 Pipeline 阶段"] ~~~ O2["管理全局状态"]
+        O3["记录 Provenance（来源追踪）"] ~~~ O4["处理异常 & 错误恢复"]
+    end
+
+    subgraph PIPELINE["⚙️ Pipeline 阶段（纯函数，可单独测试）"]
+        direction LR
+        P1["1️⃣<br/>Ingest<br/>PDF → 文本"] -->
+        P2["2️⃣<br/>Extract<br/>文本 → Claims"] -->
+        P3["3️⃣<br/>Compute<br/>公式 → 计算"] -->
+        P4["4️⃣<br/>Validate<br/>Schema 校验"] -->
+        P5["5️⃣<br/>Export<br/>ARM 导出"]
+    end
+
+    subgraph TOOLS["🔧 Tools（被 Pipeline 阶段调用）"]
+        T1["parse_page()<br/>PDF 截图解析"] ~~~ T2["extract_claims()<br/>Claim 提取"]
+        T3["dry_run_calc()<br/>安全计算沙箱"] ~~~ T4["validate_arm()<br/>ARM Schema 校验"]
+    end
+
+    UI --> ORCH
+    ORCH --> PIPELINE
+    P1 -.-> T1
+    P2 -.-> T2
+    P3 -.-> T3
+    P4 -.-> T4
+</div>
+<div class="zoom-hint">💡 用鼠标滚轮缩放 | 拖动平移 | 或右键 → "在新标签页中打开图像"</div>
+</div>
+
+<!-- Section 2: Data Flow -->
+<div class="section">
+<h2>2. 数据流（Pipeline 阶段细节）</h2>
+
+<div class="mermaid">
+flowchart LR
+    A["📄<br/>PDF 文件<br/>（5 篇 ECS 论文）"] -->|"parse_page()"| B["📝<br/>结构化文本<br/>+ 页码映射"]
+    B -->|"extract_claims()"| C["✅ Claim 列表<br/>📎 Evidence 列表<br/>🔢 数值声明列表"]
+    C -->|"dry_run_calc()"| D["🧮 Dry-run 结果<br/>✓ 通过<br/>✗ 失败<br/>? 无法验证"]
+    D -->|"validate_arm()"| E["📋 校验报告<br/>通过项 / 缺失项<br/>review_required"]
+    E --> F["📦 ARM 文件<br/>.yaml / .json"]
+    E --> G["📜 运行日志 .log"]
+    F --> H["🖥️ UI 展示 & 下载"]
+    G --> H
+</div>
+
+<div class="decision-card">
+  <strong>🔑 关键设计：</strong>每个 Pipeline 阶段的 <strong>输入输出都是 Pydantic 对象</strong>，不传裸 dict。阶段间接口清晰，任何阶段可以独立用 fixture 文本做单元测试，不需要依赖上下游跑通。
+</div>
+</div>
+
+<!-- Section 3: ARM Schema -->
+<div class="section">
+<h2>3. ARM 结构化 Schema（Pydantic）</h2>
+
+<div class="mermaid">
+classDiagram
+    class ARM {
+        +Metadata metadata
+        +List~Claim~ claims          「≥5 条」
+        +List~Evidence~ evidence     「≥5 条」
+        +Protocol protocol
+        +Runbook runbook
+        +EvalPlan eval_plan
+        +Provenance provenance
+        +List~Limitation~ limitations
+        +List~Artifact~ artifacts
+    }
+
+    class Claim {
+        +str id                        C-001
+        +str text                      结论原文
+        +ClaimType type                experimental / computational / review
+        +ClaimStatus status            supported / contradicted / partial
+        +List~EvidenceRef~ evidence_refs
+        +str extraction_method         exact_quote / llm_inferred / review_required
+    }
+
+    class Evidence {
+        +str id                        E-001
+        +str source_location           Results, Section 3.2
+        +int page                      页码
+        +str paragraph                 段落文本
+        +EvidenceType type             figure / table / text / supplementary
+        +str quoted_text               原文引用
+    }
+
+    class RunbookStep {
+        +str id                        R-001
+        +str action                    操作描述
+        +str input_spec                输入规格
+        +str expected_output           预期输出
+        +bool can_dry_run              是否可试运行
+        +DryRunResult result           试运行结果
+    }
+
+    class Provenance {
+        +str source_paper_doi
+        +str extraction_date
+        +str model_version             DeepSeek V4
+        +List~ProcessingStep~ steps    每步处理记录
+    }
+
+    ARM "1" --> "5+" Claim : contains
+    ARM "1" --> "5+" Evidence : contains
+    ARM "1" --> "1" Protocol
+    ARM "1" --> "1" Runbook
+    ARM "1" --> "1" EvalPlan
+    ARM "1" --> "1" Provenance
+    ARM "1" --> "*" Limitation
+    ARM "1" --> "*" Artifact
+    Claim "1" --> "1..*" EvidenceRef : supported_by
+</div>
+</div>
+
+<!-- Section 4: Design Decisions -->
+<div class="section">
+<h2>4. 核心设计决策</h2>
+
+<table>
+  <tr><th>#</th><th>决策</th><th>理由</th><th>风险等级</th></tr>
+  <tr>
+    <td>1</td>
+    <td>每阶段输入输出都是 <strong>Pydantic 对象</strong></td>
+    <td>接口清晰，阶段可独立单元测试</td>
+    <td><span class="badge badge-green">低</span></td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><strong>Provenance 贯穿全流程</strong></td>
+    <td>每个字段记录来源页码、段落、提取方式</td>
+    <td><span class="badge badge-green">低</span></td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>Pipeline <strong>确定性优先</strong></td>
+    <td>同一论文两次运行结构一致；LLM 调用 temperature=0</td>
+    <td><span class="badge badge-green">低</span></td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>Dry-run 在 <strong>安全沙箱</strong> 中运行</td>
+    <td>只允许 math + 基础统计函数，禁止文件/网络/系统调用</td>
+    <td><span class="badge badge-yellow">中</span></td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>提取方式 <strong>三分类</strong></td>
+    <td><code>exact_quote</code> | <code>llm_inferred</code> | <code>review_required</code>，模型推断永不冒充原文</td>
+    <td><span class="badge badge-green">低</span></td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td><strong>先 Pipeline 后 Agentic</strong></td>
+    <td>线性流程优先确保七日交付，逻辑验证后在 Validate 阶段加入 self-check 循环</td>
+    <td><span class="badge badge-yellow">中</span></td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td>PDF 解析以 <strong>LLM 截图为主</strong>，PyMuPDF 为 fallback</td>
+    <td>用户偏好 LLM-as-parser；fallback 确保 DeepSeek 视觉能力不足时可降级</td>
+    <td><span class="badge badge-red">高</span></td>
+  </tr>
+</table>
+</div>
+
+<!-- Section 5: Tech Stack -->
+<div class="section">
+<h2>5. 技术选型</h2>
+
+<table>
+  <tr><th>组件</th><th>选择</th><th>原因</th></tr>
+  <tr><td>Agent 框架</td><td>OpenAI Agents SDK</td><td>考核推荐，Pydantic 原生集成，tracing 内置</td></tr>
+  <tr><td>LLM</td><td>DeepSeek V4</td><td>考核提供 API（100 元额度）</td></tr>
+  <tr><td>结构化输出</td><td>Pydantic BaseModel</td><td>SDK 原生支持 <code>output_type</code></td></tr>
+  <tr><td>Web UI</td><td>Streamlit</td><td>开发快，单页面上传+展示足够</td></tr>
+  <tr><td>PDF 处理</td><td>PyMuPDF (fitz) 文本提取 + 页码标注</td><td>DeepSeek V4 不支持视觉；PyMuPDF 更快、更确定、零 API 成本</td></tr>
+  <tr><td>Dry-run 沙箱</td><td>受限 <code>exec()</code> + 白名单</td><td>简单可控，无需 Docker</td></tr>
+  <tr><td>导出格式</td><td>YAML（人读）+ JSON（机器读）</td><td>考核要求可导出</td></tr>
+  <tr><td>测试</td><td>pytest + fixture 论文</td><td>确定性 pipeline 独立可测</td></tr>
+</table>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+  });
+  // Add zoom/pan behavior
+  document.querySelectorAll('.mermaid').forEach(el => {
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      const svg = el.querySelector('svg');
+      if (!svg) return;
+      const scale = parseFloat(svg.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || 1);
+      const newScale = Math.max(0.3, Math.min(3, scale + (e.deltaY > 0 ? -0.1 : 0.1)));
+      svg.style.transform = `scale(${newScale})`;
+      svg.style.transformOrigin = 'top left';
+    });
+  });
+</script>
+
+</body>
+</html>
