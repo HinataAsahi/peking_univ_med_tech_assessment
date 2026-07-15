@@ -27,10 +27,22 @@ def main():
         help="批量处理：论文目录路径"
     )
     parser.add_argument(
+        "--search", "-s", action="store_true",
+        help="搜索并下载 ECS 论文（5 类 × 3 篇）"
+    )
+    parser.add_argument(
         "--output", "-o", type=str, default="output",
         help="输出目录（默认: output/）"
     )
+    parser.add_argument(
+        "--email", type=str, default="student@example.com",
+        help="PubMed API 要求的联系邮箱"
+    )
     args = parser.parse_args()
+
+    if args.search:
+        _do_search(args)
+        return
 
     if not args.paper and not args.dir:
         parser.print_help()
@@ -43,6 +55,37 @@ def main():
         _process_single(orchestrator, args.paper)
     elif args.dir:
         _process_batch(orchestrator, args.dir)
+
+
+def _do_search(args):
+    """搜索并下载 ECS 论文"""
+    from tools.search_papers import search_and_download_ecs_papers
+
+    print(f"\n{'='*60}")
+    print(f"  搜索 ECS 论文（PubMed + Europe PMC + Unpaywall）")
+    print(f"  5 个类别 × 3 篇/类 = 最多 15 篇")
+    print(f"{'='*60}\n")
+
+    results = search_and_download_ecs_papers(
+        output_dir=args.output or "papers",
+        email=args.email,
+        auto_download=True,
+    )
+
+    print(f"找到 {len(results.papers)} 篇论文，下载 {len(results.downloaded)} 篇\n")
+
+    for i, p in enumerate(results.papers, 1):
+        oa_icon = "🔓" if p.is_open_access else "🔒"
+        dl_icon = "✅" if p.has_pdf else "❌"
+        print(f"{i}. {oa_icon} {dl_icon} [{p.year}] {p.title[:100]}")
+        print(f"   {', '.join(p.authors[:3])}{', ...' if len(p.authors) > 3 else ''}")
+        print(f"   DOI: {p.doi} | PMID: {p.pmid}")
+        print()
+
+    if results.downloaded:
+        print(f"📦 已下载到 {args.output or 'papers'}/:")
+        for d in results.downloaded:
+            print(f"   {d}")
 
 
 def _process_single(orchestrator: Orchestrator, paper_path: str):

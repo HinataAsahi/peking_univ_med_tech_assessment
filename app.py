@@ -41,6 +41,48 @@ with st.sidebar:
     """)
 
 # ── Main ──
+mode = st.radio("模式", ["📤 上传论文分析", "🔍 搜索并下载论文"], horizontal=True)
+
+if mode == "🔍 搜索并下载论文":
+    st.header("🔍 自动搜索 ECS 论文")
+    st.caption("通过 PubMed API 搜索 5 类 ECS 论文，检查开放获取状态，自动下载 PDF")
+
+    email = st.text_input("联系邮箱（PubMed API 要求）", value="student@example.com")
+    max_papers = st.slider("每类最大论文数", 1, 5, 3)
+
+    if st.button("🔍 开始搜索", type="primary", use_container_width=True):
+        with st.spinner("搜索中（PubMed + Unpaywall，可能需要 30 秒）..."):
+            from tools.search_papers import search_and_download_ecs_papers
+            results = search_and_download_ecs_papers(
+                output_dir="papers",
+                max_per_query=max_papers,
+                email=email,
+                auto_download=True,
+            )
+
+        st.success(f"找到 {len(results.papers)} 篇，下载 {len(results.downloaded)} 篇")
+
+        if results.papers:
+            st.subheader("📋 搜索结果")
+            for p in results.papers:
+                oa = "🔓" if p.is_open_access else "🔒"
+                dl = "✅" if p.has_pdf else "❌"
+                st.markdown(
+                    f"{oa} {dl} **[{p.year}]** {p.title}\n\n"
+                    f"*{', '.join(p.authors[:3])}* | "
+                    f"*{p.journal}* | DOI: `{p.doi}`"
+                )
+                if p.abstract:
+                    with st.expander("摘要"):
+                        st.caption(p.abstract[:500])
+
+        if results.downloaded:
+            st.subheader("📦 已下载文件")
+            for d in results.downloaded:
+                st.code(d)
+
+    st.stop()
+
 uploaded_files = st.file_uploader(
     "上传 ECS 论文 PDF（支持多篇）",
     type=["pdf"],
