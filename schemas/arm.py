@@ -36,7 +36,7 @@ class EvidenceType(str, Enum):
 # ── Source Tracking ────────────────────────────────────────────
 
 class SourceLocation(BaseModel):
-    page: int
+    page: int = 0
     section: str = ""
     quoted_text: str = ""
     figure_ref: Optional[str] = None

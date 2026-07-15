@@ -17,6 +17,14 @@ _ALLOWED_BUILTINS = {
 
 _ALLOWED_MODULES = {"math": math}
 
+# 直接暴露常用数学函数（兼容无 math. 前缀的表达式）
+_MATH_FUNCTIONS = {
+    "sqrt": math.sqrt, "exp": math.exp, "log": math.log,
+    "sin": math.sin, "cos": math.cos, "tan": math.tan,
+    "pi": math.pi, "e": math.e,
+    "pow": pow, "abs": abs, "round": round,
+}
+
 # 安全限制
 _MAX_TIMEOUT_SEC = 5
 _MAX_OUTPUT_LEN = 10_000
@@ -57,6 +65,7 @@ def dry_run_calc(statement: NumericalStatement, tolerance: float = 0.05) -> DryR
     safe_globals = {
         "__builtins__": _ALLOWED_BUILTINS,
         **_ALLOWED_MODULES,
+        **_MATH_FUNCTIONS,
         **statement.parameters
     }
     safe_locals: dict = {}
