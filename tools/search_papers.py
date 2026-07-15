@@ -100,7 +100,84 @@ def search_pubmed(
     return results
 
 
-def _parse_pubmed_article(article: ET.Element) -> PaperSearchResult:
+# ── Europe PMC REST API ────────────────────────────────────────
+
+def search_europepmc(
+    query: str,
+    max_results: int = 10,
+    years: str = "2023:2026",
+) -> SearchResults:
+    """通过 Europe PMC REST API 搜索论文。
+
+    Europe PMC 聚合 PubMed 摘要和全文，直接返回 OA PDF 链接，
+    无需额外调用 Unpaywall。
+
+    Args:
+        query: 查询表达式
+        max_results: 最大返回数
+        years: 年份范围 "2023:2026"
+
+    Returns:
+        SearchResults: 含论文元数据和 PDF 链接
+    """
+    import json
+
+    full_query = f"({query}) AND (FIRST_PDATE:[{years[:4]}-01-01 TO {years[5:]}-12-31])"
+    results = SearchResults(query=full_query)
+
+    try:
+        url = (
+            f"{EUROPEPMC_BASE}/search"
+            f"?query={urllib.request.quote(full_query)}"
+            f"&format=json&resultType=core"
+            f"&pageSize={max_results}"
+            f"&sort=RELEVANCE"
+        )
+        resp = urllib.request.urlopen(url, timeout=15)
+        data = json.loads(resp.read().decode())
+    except Exception:
+        return results
+
+    hits = data.get("resultList", {}).get("result", [])
+    results.total_hits = data.get("hitCount", 0)
+
+    for item in hits:
+        doi = item.get("doi", "")
+        pmid = item.get("pmid", "") or item.get("id", "")
+
+        # Europe PMC 直接提供 OA PDF 链接
+        pdf_url = ""
+        has_pdf = item.get("hasPDF", False)
+        full_text_list = item.get("fullTextUrlList", [])
+        if full_text_list:
+            for ft in full_text_list:
+                if ft.get("documentStyle") == "pdf":
+                    pdf_url = ft.get("url", "")
+                    break
+
+        abstract = item.get("abstractText", "")
+        # 去掉 HTML 标签
+        if abstract:
+            import re
+            abstract = re.sub(r"<[^>]+>", "", abstract)
+
+        results.papers.append(PaperSearchResult(
+            pmid=pmid,
+            title=item.get("title", ""),
+            authors=[s.strip() for s in item.get("authorString", "").split(",") if s.strip()],
+            journal=item.get("journalTitle", ""),
+            year=item.get("pubYear", 0),
+            doi=doi,
+            abstract=abstract,
+            has_pdf=has_pdf,
+            pdf_url=pdf_url,
+            is_open_access=has_pdf,
+        ))
+
+    return results
+
+
+# ── PubMed XML 解析 ────────────────────────────────────────────
     """解析单个 PubMed Article XML 元素"""
     medline = article.find(".//MedlineCitation")
     article_elem = medline.find(".//Article") if medline is not None else None
@@ -245,16 +322,18 @@ def search_and_download_ecs_papers(
     max_per_query: int = 3,
     email: str = "student@example.com",
     auto_download: bool = True,
+    backend: str = "europepmc",
 ) -> SearchResults:
-    """搜索并下载 ECS 领域 5 类论文（每个类别 max_per_query 篇）。
+    """搜索并下载 ECS 领域 5 类论文。
 
     这是面向 Agent 的整合工具——一次调用完成搜索 + OA 检查 + 下载。
 
     Args:
         output_dir: PDF 下载目录
         max_per_query: 每个搜索类别的最大论文数
-        email: NCBI 要求的联系邮箱
+        email: PubMed API 要求的联系邮箱（仅 pubmed backend）
         auto_download: 是否自动下载 OA PDF
+        backend: "europepmc"（默认，推荐）或 "pubmed"
 
     Returns:
         SearchResults: 包含所有论文和下载路径
@@ -263,19 +342,25 @@ def search_and_download_ecs_papers(
     downloaded: list[str] = []
 
     for category, query in ECS_QUERIES.items():
-        # 搜索
-        results = search_pubmed(query, max_results=max_per_query, email=email)
-        time.sleep(0.5)  # NCBI rate limit
+        if backend == "europepmc":
+            # Europe PMC：一步获取元数据 + OA PDF 链接
+            results = search_europepmc(query, max_results=max_per_query)
+        else:
+            # PubMed + Unpaywall：两步
+            results = search_pubmed(query, max_results=max_per_query, email=email)
+            time.sleep(0.5)
 
         for paper in results.papers:
             if not paper.doi:
                 continue
 
-            # 检查 OA
-            oa = check_open_access(paper.doi)
-            paper.is_open_access = oa["is_oa"]
-            paper.has_pdf = bool(oa.get("pdf_url"))
-            paper.pdf_url = oa.get("pdf_url", "")
+            if backend == "pubmed":
+                oa = check_open_access(paper.doi)
+                paper.is_open_access = oa["is_oa"]
+                paper.has_pdf = bool(oa.get("pdf_url"))
+                paper.pdf_url = oa.get("pdf_url", "")
+                time.sleep(0.3)
+
             all_papers.append(paper)
 
             # 下载
@@ -287,8 +372,11 @@ def search_and_download_ecs_papers(
                     downloaded.append(path)
                 time.sleep(0.3)
 
+        if backend == "pubmed":
+            time.sleep(0.5)  # NCBI rate limit
+
     return SearchResults(
-        query="ECS 5-category automated search",
+        query=f"ECS 5-category automated search (backend={backend})",
         total_hits=len(all_papers),
         papers=all_papers,
         downloaded=downloaded,

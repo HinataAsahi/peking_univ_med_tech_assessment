@@ -51,7 +51,7 @@ if mode == "🔍 搜索并下载论文":
     max_papers = st.slider("每类最大论文数", 1, 5, 3)
 
     if st.button("🔍 开始搜索", type="primary", use_container_width=True):
-        with st.spinner("搜索中（PubMed + Unpaywall，可能需要 30 秒）..."):
+        with st.spinner("搜索中（Europe PMC API，可能需要 15 秒）..."):
             from tools.search_papers import search_and_download_ecs_papers
             results = search_and_download_ecs_papers(
                 output_dir="papers",

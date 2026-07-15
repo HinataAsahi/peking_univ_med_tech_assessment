@@ -62,7 +62,7 @@ def _do_search(args):
     from tools.search_papers import search_and_download_ecs_papers
 
     print(f"\n{'='*60}")
-    print(f"  搜索 ECS 论文（PubMed + Europe PMC + Unpaywall）")
+    print(f"  搜索 ECS 论文（Europe PMC REST API）")
     print(f"  5 个类别 × 3 篇/类 = 最多 15 篇")
     print(f"{'='*60}\n")
 
