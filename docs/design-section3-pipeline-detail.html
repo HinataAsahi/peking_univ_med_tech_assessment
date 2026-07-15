@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第三节：Pipeline 阶段详细设计</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    color: #212529;
+  }
+  h1 { border-bottom: 3px solid #0d6efd; padding-bottom: 12px; }
+  h2 { margin-top: 48px; color: #0d6efd; }
+  h3 { color: #495057; }
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 24px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 24px 0;
+    overflow: auto;
+    cursor: grab;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .mermaid:active { cursor: grabbing; }
+  .mermaid svg { max-width: none !important; height: auto !important; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #e9ecef; font-weight: 600; }
+  .stage-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stage-num {
+    background: #0d6efd;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .pydantic-block {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+  }
+  .pydantic-block .kw { color: #a626a4; }
+  .pydantic-block .ty { color: #0d6efd; }
+  .pydantic-block .str { color: #50a14f; }
+  .pydantic-block .cmt { color: #a0a1a7; }
+  .pydantic-block .fn { color: #4078f2; }
+  .error-card {
+    border-left: 4px solid #dc3545;
+    background: #fff5f5;
+    padding: 14px 18px;
+    margin: 10px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+  }
+  .error-card strong { color: #dc3545; }
+  .prov-card {
+    border-left: 4px solid #198754;
+    background: #f0fff4;
+    padding: 14px 18px;
+    margin: 10px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+  }
+  .prov-card strong { color: #198754; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-i { background: #e0e7ff; color: #3730a3; }
+  .badge-o { background: #d1fae5; color: #065f46; }
+  .badge-e { background: #fee2e2; color: #991b1b; }
+  .zoom-hint {
+    text-align: center;
+    color: #6c757d;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .flow-row {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .flow-box {
+    background: #e9ecef;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    text-align: center;
+  }
+  .flow-arrow { font-size: 20px; color: #0d6efd; }
+</style>
+</head>
+<body>
+
+<h1>⚙️ 第三节：Pipeline 阶段详细设计</h1>
+
+<!-- Overview -->
+<div class="section">
+<h2>1. 概览：5 阶段全景</h2>
+
+<div class="mermaid">
+flowchart LR
+    subgraph S1["1️⃣ Ingest"]
+        I1["PDF 文件"]
+        I2["PyMuPDF 提取"]
+        I3["ParsedPaper"]
+    end
+    subgraph S2["2️⃣ Extract"]
+        E1["Claim 提取"]
+        E2["Evidence 对齐"]
+        E3["数值声明"]
+    end
+    subgraph S3["3️⃣ Compute"]
+        C1["公式解析"]
+        C2["安全执行"]
+        C3["DryRunResult"]
+    end
+    subgraph S4["4️⃣ Validate"]
+        V1["Schema 检查"]
+        V2["Provenance 检查"]
+        V3["review_required"]
+    end
+    subgraph S5["5️⃣ Export"]
+        X1["ARM YAML"]
+        X2["ARM JSON"]
+        X3["Run Log"]
+    end
+
+    S1 --> S2 --> S3 --> S4 --> S5
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<table>
+  <tr><th>阶段</th><th>输入类型</th><th>输出类型</th><th>调用工具</th><th>LLM 调用</th></tr>
+  <tr>
+    <td><strong>1. Ingest</strong></td>
+    <td><code>Path</code> (PDF 文件路径)</td>
+    <td><code>ParsedPaper</code></td>
+    <td><code>parse_pdf()</code></td>
+    <td>无</td>
+  </tr>
+  <tr>
+    <td><strong>2. Extract</strong></td>
+    <td><code>ParsedPaper</code></td>
+    <td><code>ExtractionResult</code></td>
+    <td><code>extract_claims()</code></td>
+    <td>有（DeepSeek V4）</td>
+  </tr>
+  <tr>
+    <td><strong>3. Compute</strong></td>
+    <td><code>List[NumericalStatement]</code></td>
+    <td><code>List[DryRunResult]</code></td>
+    <td><code>dry_run_calc()</code></td>
+    <td>有（公式转译）</td>
+  </tr>
+  <tr>
+    <td><strong>4. Validate</strong></td>
+    <td><code>ARM</code> (部分填充)</td>
+    <td><code>ValidationReport</code></td>
+    <td><code>validate_arm()</code></td>
+    <td>无</td>
+  </tr>
+  <tr>
+    <td><strong>5. Export</strong></td>
+    <td><code>ARM</code> + <code>ValidationReport</code></td>
+    <td><code>Path</code> (输出文件)</td>
+    <td>无</td>
+    <td>无</td>
+  </tr>
+</table>
+</div>
+
+<!-- Stage 1: Ingest -->
+<div class="section">
+<div class="stage-header"><div class="stage-num">1</div><h2 style="margin:0">Ingest：PDF → 结构化文本</h2></div>
+
+<h3>输入 / 输出</h3>
+<div class="pydantic-block">
+<span class="kw">class</span> <span class="ty">ParsedPaper</span>(<span class="ty">BaseModel</span>):
+<span class="cmt">    """PyMuPDF 提取后的结构化论文文本"""</span>
+    title: <span class="ty">str</span>                         <span class="cmt"># 从 PDF metadata 或第一页提取</span>
+    pages: <span class="ty">list</span>[<span class="ty">Page</span>]                     <span class="cmt"># 每页内容</span>
+    metadata: <span class="ty">PaperMetadata</span>              <span class="cmt"># DOI, 作者, 期刊等</span>
+    raw_text: <span class="ty">str</span>                       <span class="cmt"># 全文中联文本（备用）</span>
+
+<span class="kw">class</span> <span class="ty">Page</span>(<span class="ty">BaseModel</span>):
+    number: <span class="ty">int</span>                          <span class="cmt"># 页码（从 1 开始）</span>
+    text: <span class="ty">str</span>                           <span class="cmt"># 该页文本内容</span>
+    blocks: <span class="ty">list</span>[<span class="ty">TextBlock</span>]               <span class="cmt"># 段落/文本块</span>
+
+<span class="kw">class</span> <span class="ty">TextBlock</span>(<span class="ty">BaseModel</span>):
+    text: <span class="ty">str</span>                           <span class="cmt"># 段落文本</span>
+    bbox: <span class="ty">tuple</span>[<span class="ty">float</span>, <span class="ty">float</span>, <span class="ty">float</span>, <span class="ty">float</span>]  <span class="cmt"># 边界框 (x0,y0,x1,y1)</span>
+    block_type: <span class="ty">Literal</span>[<span class="str">"text"</span>, <span class="str">"image"</span>, <span class="str">"table"</span>]
+</div>
+
+<h3>处理逻辑</h3>
+<div class="mermaid">
+flowchart TD
+    A["📄 PDF 文件路径"] --> B["fitz.open(file_path)"]
+    B --> C["遍历 page in doc"]
+    C --> D["page.get_text('blocks')"]
+    D --> E["按 block 类型分类<br/>text / image / table"]
+    E --> F{"block_type?"}
+    F -->|"text"| G["保留文本<br/>+ 页码标注"]
+    F -->|"image"| H["记录位置<br/>Figure @ page N<br/>不提取内容"]
+    F -->|"table"| I["记录位置<br/>Table @ page N<br/>尝试文本提取"]
+    G --> J["组装 ParsedPaper"]
+    H --> J
+    I --> J
+    J --> K["传入 Extract 阶段"]
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>错误处理</h3>
+<div class="error-card">
+  <strong>PDF 无法打开</strong> → 抛出 <code>IngestError(file=..., reason="corrupted_pdf")</code>，终止 Pipeline
+</div>
+<div class="error-card">
+  <strong>PDF 无文本层</strong>（扫描版 PDF）→ 抛出 <code>IngestError(reason="no_text_layer")</code>，提示用户提供 OCR 版本或替换论文
+</div>
+<div class="error-card">
+  <strong>页数超过上限</strong>（> 50 页）→ 截取前 50 页，记录 warning 到 provenance
+</div>
+</div>
+
+<!-- Stage 2: Extract -->
+<div class="section">
+<div class="stage-header"><div class="stage-num">2</div><h2 style="margin:0">Extract：文本 → Claims + Evidence + 数值声明</h2></div>
+
+<h3>输入 / 输出</h3>
+<div class="pydantic-block">
+<span class="kw">class</span> <span class="ty">ExtractionResult</span>(<span class="ty">BaseModel</span>):
+<span class="cmt">    """Extract 阶段的完整输出"""</span>
+    claims: <span class="ty">list</span>[<span class="ty">Claim</span>]                    <span class="cmt"># ≥ 5 条</span>
+    evidence_items: <span class="ty">list</span>[<span class="ty">Evidence</span>]           <span class="cmt"># ≥ 5 条</span>
+    numerical_statements: <span class="ty">list</span>[<span class="ty">NumericalStatement</span>]
+    protocol: <span class="ty">Protocol</span>                    <span class="cmt"># 研究方法描述</span>
+    limitations: <span class="ty">list</span>[<span class="ty">Limitation</span>]          <span class="cmt"># 论文自述或 Agent 识别的局限</span>
+
+<span class="kw">class</span> <span class="ty">Claim</span>(<span class="ty">BaseModel</span>):
+    id: <span class="ty">str</span>                              <span class="cmt"># "C-001", "C-002", ...</span>
+    text: <span class="ty">str</span>                           <span class="cmt"># 结论原文或近原文表述</span>
+    type: <span class="ty">ClaimType</span>                     <span class="cmt"># experimental_result | computational | review_statement</span>
+    status: <span class="ty">ClaimStatus</span> = <span class="str">"unverified"</span>   <span class="cmt"># unverified → supported | contradicted | partial</span>
+    extraction_method: <span class="ty">ExtractionMethod</span>   <span class="cmt"># ★ provenance 核心字段</span>
+    source: <span class="ty">SourceLocation</span>               <span class="cmt"># 页码 + 段落引用</span>
+    evidence_refs: <span class="ty">list</span>[<span class="ty">str</span>] = []          <span class="cmt"># ["E-001", "E-002"]</span>
+
+<span class="kw">class</span> <span class="ty">ExtractionMethod</span>(<span class="ty">str</span>, <span class="ty">Enum</span>):
+    EXACT_QUOTE = <span class="str">"exact_quote"</span>          <span class="cmt"># 原文直接引用 → 最高可信度</span>
+    LLM_INFERRED = <span class="str">"llm_inferred"</span>        <span class="cmt"># 模型推断/概括 → 需标记</span>
+    REVIEW_REQUIRED = <span class="str">"review_required"</span>  <span class="cmt"># 无法确定 → 必须人工复核</span>
+
+<span class="kw">class</span> <span class="ty">SourceLocation</span>(<span class="ty">BaseModel</span>):
+    page: <span class="ty">int</span>                            <span class="cmt"># 页码</span>
+    section: <span class="ty">str</span>                         <span class="cmt"># "Results, Section 3.2"</span>
+    quoted_text: <span class="ty">str</span>                    <span class="cmt"># 原文引用片段</span>
+    figure_ref: <span class="ty">str</span> | <span class="kw">None</span>               <span class="cmt"># "Figure 3" 或 None</span>
+    table_ref: <span class="ty">str</span> | <span class="kw">None</span>               <span class="cmt"># "Table S2" 或 None</span>
+
+<span class="kw">class</span> <span class="ty">NumericalStatement</span>(<span class="ty">BaseModel</span>):
+    id: <span class="ty">str</span>                              <span class="cmt"># "N-001"</span>
+    claim_id: <span class="ty">str</span>                        <span class="cmt"># 关联的 claim</span>
+    formula_nl: <span class="ty">str</span>                      <span class="cmt"># 自然语言公式："λ = √(D/D*)"</span>
+    parameters: <span class="ty">dict</span>[<span class="ty">str</span>, <span class="ty">float</span>]         <span class="cmt"># {"D": 7.6e-6, "D_star": 2.9e-6}</span>
+    reported_value: <span class="ty">float</span>                <span class="cmt"># 论文报告值</span>
+    unit: <span class="ty">str</span>                            <span class="cmt"># "cm²/s"</span>
+    source: <span class="ty">SourceLocation</span>               <span class="cmt"># 出处</span>
+</div>
+
+<h3>LLM Prompt 结构（核心）</h3>
+<div class="pydantic-block">
+<span class="cmt"># prompts/extract_claims.md</span>
+
+<span class="kw">You are</span> an ECS literature extraction specialist.
+
+<span class="kw">Input:</span> structured paper text with page numbers.
+
+<span class="kw">Extract:</span>
+<span class="num">1.</span> <span class="kw">Claims</span> — at least 5 key scientific conclusions.
+   For each claim, you MUST specify:
+   - <span class="kw">extraction_method:</span> "exact_quote" if you can quote the
+     paper verbatim; "llm_inferred" if you are summarizing or
+     interpreting; "review_required" if the text is ambiguous.
+
+<span class="num">2.</span> <span class="kw">Evidence</span> — for each claim, the supporting source:
+   page number, section name, figure/table reference,
+   and the exact quoted text.
+
+<span class="num">3.</span> <span class="kw">Numerical statements</span> — any quantitative relationship
+   that can be computationally verified (equations,
+   reported values with units, statistical results).
+
+<span class="kw">CRITICAL RULES:</span>
+- NEVER fabricate data, references, or values.
+- If a claim lacks clear evidence, set extraction_method=
+  "review_required".
+- If a numerical statement is missing parameters for
+  verification, mark it explicitly.
+- Distinguish between what the paper STATES vs what you
+  INFER. Inference MUST be tagged as "llm_inferred".
+</div>
+
+<h3>错误处理</h3>
+<div class="error-card">
+  <strong>Claims 少于 5 条</strong> → 标记 <code>review_required</code>，用 LLM 二次扫描未被覆盖的章节，仍不足则记录到 limitations
+</div>
+<div class="error-card">
+  <strong>某 Claim 缺 Evidence</strong> → <code>extraction_method = "review_required"</code>，不编造证据
+</div>
+<div class="error-card">
+  <strong>LLM 返回了不在原文中的内容</strong> → Validate 阶段会交叉校验 <code>quoted_text</code> 是否在原文中出现（子串匹配）
+</div>
+</div>
+
+<!-- Stage 3: Compute -->
+<div class="section">
+<div class="stage-header"><div class="stage-num">3</div><h2 style="margin:0">Compute：数值声明 → Dry-run 验证</h2></div>
+
+<h3>输入 / 输出</h3>
+<div class="pydantic-block">
+<span class="kw">class</span> <span class="ty">DryRunResult</span>(<span class="ty">BaseModel</span>):
+    statement_id: <span class="ty">str</span>                     <span class="cmt"># "N-001"</span>
+    status: <span class="ty">DryRunStatus</span>                 <span class="cmt"># passed | mismatch | insufficient_data | calculation_error</span>
+    computed_value: <span class="ty">float</span> | <span class="kw">None</span>         <span class="cmt"># 计算结果</span>
+    reported_value: <span class="ty">float</span> | <span class="kw">None</span>         <span class="cmt"># 论文报告值</span>
+    deviation_pct: <span class="ty">float</span> | <span class="kw">None</span>          <span class="cmt"># 偏差百分比</span>
+    python_expr: <span class="ty">str</span>                     <span class="cmt"># 实际执行的 Python 表达式</span>
+    error_message: <span class="ty">str</span> | <span class="kw">None</span>            <span class="cmt"># 失败原因</span>
+    sandbox_log: <span class="ty">str</span>                    <span class="cmt"># 沙箱执行日志</span>
+</div>
+
+<h3>执行流程（4 步）</h3>
+
+<div class="mermaid">
+flowchart TD
+    NS["📥 NumericalStatement<br/>formula_nl: 'λ = √(D/D*)'<br/>params: {D:7.6e-6, D*:2.9e-6}<br/>reported: 1.62"]
+
+    S1["🔤 步骤 1：公式转译<br/>LLM 将自然语言公式<br/>转为 Python 表达式<br/>──<br/>输入: 'λ = √(D/D*)'<br/>输出: 'sqrt(D / D_star)'"]
+
+    S2["📎 步骤 2：参数绑定<br/>论文参数 → Python 变量<br/>──<br/>D = 7.6e-6<br/>D_star = 2.9e-6"]
+
+    S3["⚡ 步骤 3：安全执行<br/>白名单 exec()<br/>──<br/>timeout: 5s<br/>memory: 100MB<br/>allowed: math + numpy"]
+
+    S4["📊 步骤 4：结果对比<br/>容差 = 5%<br/>──<br/>|1.618 - 1.62|/1.62<br/>= 0.12% < 5%<br/>→ passed"]
+
+    S4 -->|"passed"| P[✅ 成功案例]
+    S4 -->|"mismatch"| M[⚠ 偏差过大]
+    S4 -->|"error"| E[✗ 执行失败]
+    S4 -->|"no params"| D[❓ 数据不足]
+
+    NS --> S1 --> S2 --> S3 --> S4
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>错误处理</h3>
+<div class="error-card">
+  <strong>公式转译失败</strong>（LLM 无法转为 Python）→ <code>calculation_error</code>，保留原始 formula_nl 供人工审查
+</div>
+<div class="error-card">
+  <strong>参数不足</strong>（论文只给了方向没给数值）→ <code>insufficient_data</code>，建议 review_required
+</div>
+<div class="error-card">
+  <strong>执行超时 / 异常</strong>（除零、溢出等）→ <code>calculation_error</code>，记录完整 traceback
+</div>
+<div class="error-card">
+  <strong>结果偏差 > 5%</strong> → <code>mismatch</code>，不自动判定谁对谁错，标记需要人工判断
+</div>
+</div>
+
+<!-- Stage 4: Validate -->
+<div class="section">
+<div class="stage-header"><div class="stage-num">4</div><h2 style="margin:0">Validate：Schema 完整性 + Provenance 覆盖率</h2></div>
+
+<h3>输入 / 输出</h3>
+<div class="pydantic-block">
+<span class="kw">class</span> <span class="ty">ValidationReport</span>(<span class="ty">BaseModel</span>):
+    arm_id: <span class="ty">str</span>                          <span class="cmt"># 对应的 ARM 标识</span>
+    schema_valid: <span class="ty">bool</span>                   <span class="cmt"># Pydantic schema 校验是否通过</span>
+    schema_errors: <span class="ty">list</span>[<span class="ty">str</span>]              <span class="cmt"># schema 违规列表</span>
+
+    provenance_score: <span class="ty">float</span>              <span class="cmt"># 0.0 ~ 1.0，有 provenance 的字段占比</span>
+    unverified_fields: <span class="ty">list</span>[<span class="ty">str</span>]          <span class="cmt"># 缺少 provenance 的字段</span>
+
+    review_required_count: <span class="ty">int</span>          <span class="cmt"># review_required 标记数</span>
+    review_items: <span class="ty">list</span>[<span class="ty">ReviewItem</span>]        <span class="cmt"># 需要人工复核的项</span>
+
+    claim_evidence_gaps: <span class="ty">list</span>[<span class="ty">str</span>]       <span class="cmt"># 有 claim 但缺 evidence 的情况</span>
+    hallucination_flags: <span class="ty">list</span>[<span class="ty">str</span>]      <span class="cmt"># quoted_text 在原文中找不到匹配</span>
+
+    warnings: <span class="ty">list</span>[<span class="ty">str</span>]                  <span class="cmt"># 非阻塞性警告</span>
+    passed: <span class="ty">bool</span>                        <span class="cmt"># 整体是否通过（无 CRITICAL 问题）</span>
+
+<span class="kw">class</span> <span class="ty">ReviewItem</span>(<span class="ty">BaseModel</span>):
+    field_path: <span class="ty">str</span>                      <span class="cmt"># "claims[3].text"</span>
+    reason: <span class="ty">str</span>                         <span class="cmt"># "extraction_method = review_required"</span>
+    suggestion: <span class="ty">str</span>                     <span class="cmt"># "请人工核对原文 Section 3.2 确认该结论"</span>
+</div>
+
+<h3>校验规则（6 条）</h3>
+
+<div class="mermaid">
+flowchart TD
+    ARM["📦 ARM（部分填充）"] --> R1
+    R1["规则 1：Schema 完整性<br/>Pydantic 类型校验<br/>必填字段非空"] --> R1P{"通过?"}
+    R1P -->|"✗"| F1["记录 schema_errors"]
+    R1P -->|"✓"| R2
+
+    R2["规则 2：Claim ≥ 5 条<br/>Evidence ≥ 5 条"] --> R2P{"通过?"}
+    R2P -->|"✗"| F2["标记 review_required"]
+    R2P -->|"✓"| R3
+
+    R3["规则 3：每条 Claim 至少<br/>关联 1 条 Evidence"] --> R3P{"通过?"}
+    R3P -->|"✗"| F3["记录 claim_evidence_gaps"]
+    R3P -->|"✓"| R4
+
+    R4["规则 4：Hallucination 检测<br/>quoted_text 子串匹配原文"] --> R4P{"通过?"}
+    R4P -->|"✗"| F4["记录 hallucination_flags<br/>→ review_required"]
+    R4P -->|"✓"| R5
+
+    R5["规则 5：Provenance 覆盖<br/>每个字段有 source 记录"] --> R5P{"通过?"}
+    R5P -->|"✗"| F5["记录 unverified_fields"]
+    R5P -->|"✓"| R6
+
+    R6["规则 6：模型推断不冒充原文<br/>llm_inferred 字段已标记"] --> R6P{"通过?"}
+    R6P -->|"✗"| F6["标记 review_required"]
+    R6P -->|"✓"| PASS["✅ ValidationReport.passed = true"]
+
+    F1 --> FAIL["❌ passed = false"]
+    F2 --> FAIL
+    F3 --> FAIL
+    F4 --> FAIL
+    F5 --> FAIL
+    F6 --> FAIL
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>Hallucination 检测算法</h3>
+<div class="pydantic-block">
+<span class="kw">def</span> <span class="fn">check_quoted_text_in_source</span>(
+    quoted: <span class="ty">str</span>,
+    page_text: <span class="ty">str</span>,
+    threshold: <span class="ty">float</span> = <span class="num">0.6</span>
+) -> <span class="ty">bool</span>:
+<span class="cmt">    """检查 quoted_text 是否在原文中出现</span>
+<span class="cmt">    1. 先做精确子串匹配</span>
+<span class="cmt">    2. 如精确匹配失败，做 fuzzy 匹配（token overlap）</span>
+<span class="cmt">    3. fuzzy 匹配 < threshold → 标记为潜在 hallucination</span>
+<span class="cmt">    """</span>
+    <span class="kw">if</span> quoted <span class="kw">in</span> page_text:
+        <span class="kw">return</span> <span class="kw">True</span>
+
+    quoted_tokens = <span class="fn">set</span>(quoted.lower().split())
+    page_tokens = <span class="fn">set</span>(page_text.lower().split())
+    overlap = <span class="fn">len</span>(quoted_tokens & page_tokens)
+    ratio = overlap / <span class="fn">len</span>(quoted_tokens)
+
+    <span class="kw">return</span> ratio >= threshold
+</div>
+</div>
+
+<!-- Stage 5: Export -->
+<div class="section">
+<div class="stage-header"><div class="stage-num">5</div><h2 style="margin:0">Export：ARM 组装 + 文件输出</h2></div>
+
+<h3>输出文件</h3>
+
+<table>
+  <tr><th>文件</th><th>格式</th><th>用途</th></tr>
+  <tr><td><code>output/{paper_doi}/arm.yaml</code></td><td>YAML</td><td>人类可读的 ARM，PPT 演示时可高亮展示</td></tr>
+  <tr><td><code>output/{paper_doi}/arm.json</code></td><td>JSON</td><td>结构化 ARM，供其他 Agent 或程序消费</td></tr>
+  <tr><td><code>output/{paper_doi}/run.log</code></td><td>文本</td><td>完整运行日志：每阶段耗时、工具调用参数、验证结果</td></tr>
+  <tr><td><code>output/{paper_doi}/validation.json</code></td><td>JSON</td><td>ValidationReport 序列化</td></tr>
+</table>
+
+<h3>ARM YAML 示例片段</h3>
+<div class="pydantic-block">
+<span class="cmt"># output/nicholson_1998/arm.yaml</span>
+<span class="kw">metadata:</span>
+  title: <span class="str">"Extracellular space structure revealed by diffusion analysis"</span>
+  doi: <span class="str">"10.1016/S0166-2236(98)01261-2"</span>
+  year: <span class="num">1998</span>
+
+<span class="kw">claims:</span>
+  - id: <span class="str">"C-001"</span>
+    text: <span class="str">"皮层 ECS 体积分数 α 约为 0.20"</span>
+    type: <span class="str">"review_statement"</span>
+    extraction_method: <span class="str">"exact_quote"</span>
+    source:
+      page: <span class="num">3</span>
+      section: <span class="str">"Volume fraction measurements"</span>
+      quoted_text: <span class="str">"The volume fraction of the ECS in the cortex is approximately 0.20"</span>
+    evidence_refs: [<span class="str">"E-001"</span>]
+    dry_run:
+      status: <span class="str">"passed"</span>
+      computed: <span class="num">0.198</span>
+      reported: <span class="num">0.20</span>
+      deviation_pct: <span class="num">1.0</span>
+
+  - id: <span class="str">"C-004"</span>
+    text: <span class="str">"缺血后 α 降至基线的约 30%"</span>
+    extraction_method: <span class="str">"review_required"</span>
+    source:
+      page: <span class="num">8</span>
+      section: <span class="str">"Pathological changes"</span>
+    dry_run:
+      status: <span class="str">"insufficient_data"</span>
+      note: <span class="str">"缺少基线 α 绝对值和完整时间序列数据"</span>
+
+<span class="kw">provenance:</span>
+  extraction_date: <span class="str">"2026-07-16"</span>
+  model: <span class="str">"DeepSeek V4"</span>
+  processing_steps:
+    - stage: <span class="str">"ingest"</span>
+      tool: <span class="str">"parse_pdf"</span>
+      duration_ms: <span class="num">234</span>
+    - stage: <span class="str">"extract"</span>
+      tool: <span class="str">"extract_claims"</span>
+      duration_ms: <span class="num">4521</span>
+</div>
+</div>
+
+<!-- Summary -->
+<div class="section">
+<h2>6. 阶段间合约（Contracts）</h2>
+
+<table>
+  <tr><th>阶段</th><th>输入保证（Precondition）</th><th>输出保证（Postcondition）</th></tr>
+  <tr>
+    <td>Ingest</td>
+    <td>PDF 文件存在且可读</td>
+    <td>每页有 page.number + text，metadata 字段非空</td>
+  </tr>
+  <tr>
+    <td>Extract</td>
+    <td>ParsedPaper.pages 非空</td>
+    <td>claims ≥ 5, evidence ≥ 5, 每条 claim 有 extraction_method</td>
+  </tr>
+  <tr>
+    <td>Compute</td>
+    <td>numerical_statements 非空</td>
+    <td>每个 statement 有 DryRunResult，status 不为空</td>
+  </tr>
+  <tr>
+    <td>Validate</td>
+    <td>ARM 的 metadata + claims + evidence 已填充</td>
+    <td>ValidationReport.passed 为 bool，所有 CRITICAL 问题已记录</td>
+  </tr>
+  <tr>
+    <td>Export</td>
+    <td>ValidationReport.passed == True</td>
+    <td>4 个输出文件全部写入，路径可追踪</td>
+  </tr>
+</table>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+  });
+  document.querySelectorAll('.mermaid').forEach(el => {
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      const svg = el.querySelector('svg');
+      if (!svg) return;
+      const scale = parseFloat(svg.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || 1);
+      const newScale = Math.max(0.3, Math.min(3, scale + (e.deltaY > 0 ? -0.1 : 0.1)));
+      svg.style.transform = `scale(${newScale})`;
+      svg.style.transformOrigin = 'top left';
+    });
+  });
+</script>
+
+</body>
+</html>

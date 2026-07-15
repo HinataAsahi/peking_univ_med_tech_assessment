@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第六节：七日开发计划与风险管理</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    color: #212529;
+  }
+  h1 { border-bottom: 3px solid #0d6efd; padding-bottom: 12px; }
+  h2 { margin-top: 48px; color: #0d6efd; }
+  h3 { color: #495057; }
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 24px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 24px 0;
+    overflow: auto;
+    cursor: grab;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .mermaid:active { cursor: grabbing; }
+  .mermaid svg { max-width: none !important; height: auto !important; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #e9ecef; font-weight: 600; }
+  .day-card {
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .day-card.d1 { border: 2px solid #0d6efd; background: #f0f7ff; }
+  .day-card.d2 { border: 2px solid #6f42c1; background: #f8f5ff; }
+  .day-card.d3 { border: 2px solid #d63384; background: #fff0f6; }
+  .day-card.d4 { border: 2px solid #fd7e14; background: #fff8f0; }
+  .day-card.d5 { border: 2px solid #198754; background: #f0fff4; }
+  .day-card.d6 { border: 2px solid #6c757d; background: #f8f9fa; }
+  .day-card.d7 { border: 2px solid #dc3545; background: #fff5f5; }
+  .day-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .day-num {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 20px;
+    color: white;
+    flex-shrink: 0;
+  }
+  .d1 .day-num { background: #0d6efd; }
+  .d2 .day-num { background: #6f42c1; }
+  .d3 .day-num { background: #d63384; }
+  .d4 .day-num { background: #fd7e14; }
+  .d5 .day-num { background: #198754; }
+  .d6 .day-num { background: #6c757d; }
+  .d7 .day-num { background: #dc3545; }
+  .deliverable {
+    background: white;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 14px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-red { background: #f8d7da; color: #842029; }
+  .badge-yellow { background: #fff3cd; color: #664d03; }
+  .badge-green { background: #d1e7dd; color: #0f5132; }
+  .badge-blue { background: #cfe2ff; color: #084298; }
+  .risk-card {
+    border-left: 4px solid #dc3545;
+    background: #fff5f5;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .dec-card {
+    border-left: 4px solid #0d6efd;
+    background: #f0f7ff;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .priority-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 6px;
+  }
+  .p0 { background: #f8d7da; color: #842029; }
+  .p1 { background: #fff3cd; color: #664d03; }
+  .p2 { background: #cfe2ff; color: #084298; }
+  .p3 { background: #e2e3e5; color: #495057; }
+  .zoom-hint {
+    text-align: center;
+    color: #6c757d;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 4px 0; }
+  .checklist li::before { content: "☐ "; color: #6c757d; }
+  .checklist li.done::before { content: "☑ "; color: #198754; }
+</style>
+</head>
+<body>
+
+<h1>📅 第六节：七日开发计划与风险管理</h1>
+
+<!-- Gantt Overview -->
+<div class="section">
+<h2>1. 七日时间线总览</h2>
+
+<div class="mermaid">
+flowchart TD
+    D1["<b>今晚 · 7/15（剩余 ~4h）</b><br/>━━━━━━━━━━━━━━━━<br/>✅ 设计完成（6 节）<br/>验证 DeepSeek API<br/>下载 5 篇论文 PDF<br/>PyMuPDF 试跑 1 篇<br/>搭建项目骨架"]
+    D2["<b>全天 · 7/16（周三）⚠ 最关键</b><br/>━━━━━━━━━━━━━━━━<br/>实现 4 个 Tools<br/>Orchestrator 主循环<br/>跑通 1 篇完整 ARM<br/>至少 1 条 dry-run<br/>文献调研报告初稿"]
+    D3["<b>全天 · 7/17（周四）⚠ 高风险</b><br/>━━━━━━━━━━━━━━━━<br/>剩余 4 篇 ARM 生成<br/>Hallucination 检测<br/>失败案例 + review_required<br/>pytest + CLI 入口"]
+    D4["<b>下午 5:00 前 · 7/18（周五）</b><br/>━━━━━━━━━━━━━━━━<br/>README + 流程图<br/>文献调研报告定稿<br/>PPT + 演示脚本<br/>提交所有产出<br/>🔒 功能冻结"]
+
+    D1 --> D2 --> D3 --> D4
+
+    style D1 fill:#f0f7ff,stroke:#0d6efd,stroke-width:2px
+    style D2 fill:#fff0f6,stroke:#d63384,stroke-width:3px
+    style D3 fill:#fff8f0,stroke:#fd7e14,stroke-width:3px
+    style D4 fill:#f8d7da,stroke:#dc3545,stroke-width:3px
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<div class="risk-card" style="margin-top:16px">
+  <strong>🚨 时间压缩警告：</strong>原定 7 天的开发量压缩到 3.5 天。"答辩时间待定"意味着可能在 7/18 当天，也可能在截止后安排。无论哪种情况，<strong>7/18 下午 5:00 前必须完成全部提交</strong>。<br/><br/>
+  <strong>关键调整：</strong>Streamlit UI 砍掉 → 改为 CLI；Dry-run 只保证 1 篇论文 ≥ 1 条 passed；剩余 4 篇 ARM 可降级为"完整性稍低但结构完整"。
+</div>
+</div>
+
+<!-- Daily Plan -->
+<div class="section">
+<h2>2. 每日详细计划</h2>
+
+<!-- Day 1: Tonight -->
+<div class="day-card d1">
+<div class="day-header"><div class="day-num">1</div><h2 style="margin:0;font-size:20px">今晚 — 7/15（剩余 ~4h）设计收尾 + 环境就绪</h2></div>
+
+<div class="deliverable">
+  <strong>必须完成：</strong>
+  <ul class="checklist" style="margin:8px 0 0 0">
+    <li class="done">选定 Track A + 完成 6 节架构设计</li>
+    <li class="done">确定 PyMuPDF 方案（DeepSeek V4 不支持视觉）</li>
+    <li>验证 DeepSeek V4 API：运行 Quickstart，确认 key 有效</li>
+    <li>下载 5 篇论文 PDF → 确定 DOI 列表</li>
+    <li>PyMuPDF 试跑 1 篇，确认文本提取质量</li>
+    <li>搭建项目骨架：<code>pip install openai-agents pydantic pymupdf streamlit pytest</code></li>
+    <li>写设计合并文档 + 提交 git</li>
+  </ul>
+</div>
+
+<table style="margin-top:12px">
+  <tr><th>风险</th><th>等级</th><th>缓解</th></tr>
+  <tr><td>DeepSeek API key 无效</td><td><span class="badge badge-red">CRITICAL</span></td><td>立即验证；如不可用，切换到 OpenAI API（自费 $5-10）</td></tr>
+  <tr><td>论文有扫描版（无文本层）</td><td><span class="badge badge-yellow">中</span></td><td>PyMuPDF 试跑 → 扫描版立即替换</td></tr>
+</table>
+</div>
+
+<!-- Day 2: Critical -->
+<div class="day-card d3">
+<div class="day-header"><div class="day-num">2</div><h2 style="margin:0;font-size:20px">7/16（周三）⚠ 最关键 — MVP + 文献调研</h2></div>
+
+<div class="deliverable">
+  <strong>必须完成（按优先级）：</strong>
+  <ul class="checklist" style="margin:8px 0 0 0">
+    <li><strong>P0：</strong>实现 4 个 Tools + Orchestrator 主循环</li>
+    <li><strong>P0：</strong>用 1 篇论文跑通完整 Pipeline → 生成第一个 ARM</li>
+    <li><strong>P0：</strong>至少 1 条 claim 有 dry-run 结果（passed）</li>
+    <li><strong>P1：</strong>剩余 4 篇论文的 ARM 生成（5 篇全覆盖）</li>
+    <li><strong>P1：</strong>Validate 阶段 6 条规则 + Hallucination 检测</li>
+    <li><strong>P1：</strong>文献调研：检索策略 + 对比表 + 10+ 来源</li>
+    <li><strong>P2：</strong>3 条调研发现 → 设计决定 → 实现结果 整理</li>
+  </ul>
+</div>
+
+<div class="risk-card">
+  <strong>🚨 今晚 12 点前：</strong>1 篇论文端到端 Pipeline 必须跑通。如果未完成，7/17 上午继续，下午启用 P2 降级。这一天不做 Streamlit、不做测试、不做文档——只求 Pipeline 跑通。
+</div>
+
+<div class="dec-card" style="margin-top:12px">
+  <strong>3 条调研发现（嵌入文献报告）：</strong><br/><br/>
+  <strong>#1：</strong>PDF 版面分析工具配置复杂 → <strong>PyMuPDF 纯文本提取</strong> → Ingest 阶段 50 行零依赖。<br/>
+  <strong>#2：</strong>ECS 湿实验无法直接 dry-run → <strong>计算验证型 dry-run</strong> → 具体 passed/mismatch/insufficient 分类。<br/>
+  <strong>#3：</strong>LLM 产生 plausible-but-wrong 的 quoted_text → <strong>子串 + fuzzy hallucination 检测</strong> → 自动标记 review_required。
+</div>
+</div>
+
+<!-- Day 3 -->
+<div class="day-card d4">
+<div class="day-header"><div class="day-num">3</div><h2 style="margin:0;font-size:20px">7/17（周四）⚠ 冲刺 — 完善 + 失败案例 + Streamlit</h2></div>
+
+<div class="deliverable">
+  <strong>必须完成：</strong>
+  <ul class="checklist" style="margin:8px 0 0 0">
+    <li><strong>P0：</strong>失败案例准备：insufficient_data + hallucination → review_required</li>
+    <li><strong>P0：</strong>CLI 入口：<code>python main.py --paper paper.pdf</code></li>
+    <li><strong>P0：</strong>pytest 测试套件（≥ 5 个）</li>
+    <li><strong>P1：</strong>Streamlit UI：上传 PDF → 运行 → 展示 ARM → 下载</li>
+    <li><strong>P1：</strong>Dry-run 覆盖 ≥ 3 篇论文</li>
+    <li><strong>P1：</strong>arm.yaml + arm.json + run.log + validation.json 完整导出</li>
+    <li><strong>P2：</strong>文献调研报告（4-6 页）初稿</li>
+    <li><strong>P2：</strong>PPT 框架（8-12 页）</li>
+  </ul>
+</div>
+
+<div class="risk-card">
+  <strong>⚠ 如果 7/16 完成了 5 篇 MVP：</strong>Day 3 上午失败案例 + 测试，下午 Streamlit + 导出，晚上文献报告初稿。<br/>
+  <strong>⚠ 如果 7/16 只完成 1 篇 MVP：</strong>上午补完剩余 4 篇，下午失败案例 + 测试，Streamlit 推到 7/18 上午。
+</div>
+</div>
+
+<!-- Day 4: Deadline -->
+<div class="day-card d7">
+<div class="day-header"><div class="day-num">4</div><h2 style="margin:0;font-size:20px">7/18（周五）下午 5:00 截止 — 文档、PPT、提交</h2></div>
+
+<div class="deliverable">
+  <strong>必须完成（上午）：</strong>
+  <ul class="checklist" style="margin:8px 0 0 0">
+    <li>🔒 功能冻结（中午 12:00 后不再改代码）</li>
+    <li>README：运行命令 + 架构图 + 成功/失败案例 + 已知限制</li>
+    <li>文献调研报告定稿（4-6 页）</li>
+    <li>PPT 定稿（8-12 页）+ 演示脚本（成功 + 失败路径台词）</li>
+    <li>最终端到端测试验证 + git tag + push</li>
+    <li>提交所有产出（PR 或提交记录）</li>
+  </ul>
+</div>
+
+<div class="risk-card">
+  <strong>🚨 下午 5:00 硬截止。</strong>上午只做文档和 PPT。下午检查、提交。答辩时间如待定则随时准备。
+</div>
+</div>
+</div>
+
+<!-- Risk Register -->
+<div class="section">
+<h2>3. 风险登记表</h2>
+
+<table>
+  <tr><th>#</th><th>风险</th><th>等级</th><th>影响</th><th>缓解</th><th>触发日</th></tr>
+  <tr>
+    <td>R1</td>
+    <td>DeepSeek API 不可用</td>
+    <td><span class="badge badge-red">CRITICAL</span></td>
+    <td>Extract 阶段无法运行 → 项目失败</td>
+    <td><strong>今晚立即验证</strong>；备用 OpenAI API（自费）</td>
+    <td>今晚</td>
+  </tr>
+  <tr>
+    <td>R2</td>
+    <td>7/16 结束时未跑通 MVP（1 篇端到端）</td>
+    <td><span class="badge badge-red">CRITICAL</span></td>
+    <td>剩余时间不够完成核心产出</td>
+    <td>7/17 上午切 P0 降级：只保 1 篇 + CLI + README</td>
+    <td>7/16 晚</td>
+  </tr>
+  <tr>
+    <td>R3</td>
+    <td>DeepSeek V4 结构化输出不稳定</td>
+    <td><span class="badge badge-red">高</span></td>
+    <td>Pydantic output_type 校验频繁失败</td>
+    <td>temperature=0 + retry × 3 + raw text fallback 解析</td>
+    <td>7/16</td>
+  </tr>
+  <tr>
+    <td>R4</td>
+    <td>5 篇论文中有扫描版 PDF</td>
+    <td><span class="badge badge-yellow">中</span></td>
+    <td>Ingest 失败，缺论文</td>
+    <td>今晚 PyMuPDF 试跑；扫描版立即替换</td>
+    <td>今晚</td>
+  </tr>
+  <tr>
+    <td>R5</td>
+    <td>论文缺少数值声明（dry-run 覆盖不足）</td>
+    <td><span class="badge badge-yellow">中</span></td>
+    <td>Dry-run 演示单薄</td>
+    <td>论文选择优先含定量数据的；手动加入经典 ECS 计算</td>
+    <td>7/17</td>
+  </tr>
+  <tr>
+    <td>R6</td>
+    <td>LLM 幻觉 + Hallucination 检测漏检</td>
+    <td><span class="badge badge-yellow">中</span></td>
+    <td>ARM 可信度受损</td>
+    <td>Validate 子串匹配 + 人工抽查 20% quoted_text</td>
+    <td>7/17</td>
+  </tr>
+  <tr>
+    <td>R7</td>
+    <td>PPT 和文献报告来不及写完</td>
+    <td><span class="badge badge-yellow">中</span></td>
+    <td>汇报质量下降</td>
+    <td>7/18 上午只做文档 PPT；设计文档直接拼装为报告</td>
+    <td>7/18</td>
+  </tr>
+</table>
+</div>
+
+<!-- Descoping Strategy -->
+<div class="section">
+<h2>4. 降级策略（砍功能顺序）</h2>
+
+<p>如果进度落后，按以下顺序砍功能。<strong>核心原则：宁可少做，不可做一个不完整的系统。</strong></p>
+
+<div class="mermaid">
+flowchart TD
+    P0["<b>P0：必须保留</b><br/>━━━━━━━━━━━━━━━━━━━━<br/>✓ 1 Agent + 4 Tools<br/>✓ Pipeline 线性流程<br/>✓ 5 篇论文 ≥ 5 claims<br/>✓ 1 条 dry-run 成功<br/>✓ 1 条 review_required<br/>✓ arm.yaml 导出<br/>✓ CLI 可运行<br/>✓ 成功案例 + 失败案例<br/>✓ README + 运行命令<br/>✓ pytest ≥ 5 个<br/>✓ 模型推断与原文区分"]
+    P1["<b>P1：优先保留</b><br/>━━━━━━━━━━━━━━━━━━━━<br/>Streamlit UI<br/>Dry-run ≥ 3 篇<br/>Hallucination 检测<br/>Run log + arm.json 导出<br/>ValidationReport"]
+    P2["<b>P2：可削减</b><br/>━━━━━━━━━━━━━━━━━━━━<br/>Fuzzy 匹配（仅精确匹配）<br/>文献调研报告完整版<br/>PPT 美化"]
+    P3["<b>P3：可放弃</b><br/>━━━━━━━━━━━━━━━━━━━━<br/>Agentic self-check loop<br/>多 Agent<br/>图表内容提取<br/>DOI 自动校验"]
+
+    P0 --> P1 --> P2 --> P3
+
+    style P0 fill:#d1e7dd,stroke:#198754,stroke-width:3px
+    style P1 fill:#cfe2ff,stroke:#0d6efd
+    style P2 fill:#fff3cd,stroke:#ffc107
+    style P3 fill:#f8d7da,stroke:#dc3545
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<div class="risk-card">
+  <strong>🚨 触发条件：</strong>7/16 晚上如果 MVP 未跑通 → 7/17 上午继续 MVP，下午启用 P2 开始砍功能。<br/><br/>
+  <strong>最低可接受交付（考核通过线）：</strong>P0 全部完成 = CLI 可运行 + 5 篇 ARM + 5 claims 可追溯 + 1 dry-run passed + 1 review_required + 成功/失败案例 + README + pytest。
+</div>
+</div>
+
+<!-- Deliverable Checklist -->
+<div class="section">
+<h2>5. 最终提交清单（对照考核要求）</h2>
+
+<table>
+  <tr><th>考核要求</th><th>对应产出</th><th>计划完成日</th></tr>
+  <tr><td>可运行原型</td><td><code>main.py</code> + Streamlit UI</td><td>7/17</td></tr>
+  <tr><td>论文输入 ≥ 5 篇</td><td>5 篇 ECS 论文 PDF + 对应 ARM</td><td>7/16</td></tr>
+  <tr><td>ARM 包含 9 字段</td><td>Pydantic ARM Schema</td><td>7/16</td></tr>
+  <tr><td>≥ 5 条结论可定位到原文</td><td>Claims + SourceLocation (page + quoted_text)</td><td>7/16</td></tr>
+  <tr><td>模型推断与原文区分</td><td>ExtractionMethod 三分类</td><td>7/16</td></tr>
+  <tr><td>≥ 1 步骤可试运行</td><td>DryRunResult (≥ 1 passed, ≥ 3 篇覆盖)</td><td>7/17</td></tr>
+  <tr><td>校验、回放、导出</td><td>ValidationReport + Run Log + YAML/JSON</td><td>7/17</td></tr>
+  <tr><td>成功案例 + 失败案例</td><td>演示脚本（第五节），Hallucination 检测</td><td>7/17</td></tr>
+  <tr><td>运行命令 + 测试</td><td>README + pytest ≥ 5</td><td>7/18</td></tr>
+  <tr><td>3 条调研→设计→实现</td><td>文献调研报告（含检索策略 + 对比表）</td><td>7/18</td></tr>
+  <tr><td>文献调研报告 4-6 页</td><td>≥ 10 来源 + 对比表 + 参考文献清单</td><td>7/18</td></tr>
+  <tr><td>PPT 8-12 页</td><td>汇报材料 + 演示脚本</td><td>7/18</td></tr>
+</table>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+    gantt: { useMaxWidth: false },
+  });
+  document.querySelectorAll('.mermaid').forEach(el => {
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      const svg = el.querySelector('svg');
+      if (!svg) return;
+      const scale = parseFloat(svg.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || 1);
+      const newScale = Math.max(0.3, Math.min(3, scale + (e.deltaY > 0 ? -0.1 : 0.1)));
+      svg.style.transform = `scale(${newScale})`;
+      svg.style.transformOrigin = 'top left';
+    });
+  });
+</script>
+
+</body>
+</html>

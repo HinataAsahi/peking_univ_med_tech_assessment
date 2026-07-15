@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第四节：Tools 定义与 Agent 行为</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    color: #212529;
+  }
+  h1 { border-bottom: 3px solid #0d6efd; padding-bottom: 12px; }
+  h2 { margin-top: 48px; color: #0d6efd; }
+  h3 { color: #495057; }
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 24px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 24px 0;
+    overflow: auto;
+    cursor: grab;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .mermaid:active { cursor: grabbing; }
+  .mermaid svg { max-width: none !important; height: auto !important; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #e9ecef; font-weight: 600; }
+  .tool-card {
+    border: 2px solid #dee2e6;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+    background: #fcfcfc;
+  }
+  .tool-card.t1 { border-left: 5px solid #0d6efd; }
+  .tool-card.t2 { border-left: 5px solid #6f42c1; }
+  .tool-card.t3 { border-left: 5px solid #d63384; }
+  .tool-card.t4 { border-left: 5px solid #198754; }
+  .tool-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .tool-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: white;
+    flex-shrink: 0;
+  }
+  .t1 .tool-icon { background: #0d6efd; }
+  .t2 .tool-icon { background: #6f42c1; }
+  .t3 .tool-icon { background: #d63384; }
+  .t4 .tool-icon { background: #198754; }
+  .code-block {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  .code-block .kw { color: #569cd6; }
+  .code-block .str { color: #ce9178; }
+  .code-block .num { color: #b5cea8; }
+  .code-block .cmt { color: #6a9955; }
+  .code-block .ty { color: #4ec9b0; }
+  .code-block .fn { color: #dcdcaa; }
+  .code-block .deco { color: #c586c0; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-llm { background: #fff3cd; color: #664d03; }
+  .badge-pure { background: #d1e7dd; color: #0f5132; }
+  .badge-future { background: #cfe2ff; color: #084298; }
+  .decision-card {
+    border-left: 4px solid #0d6efd;
+    background: #f0f7ff;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .risk-card {
+    border-left: 4px solid #dc3545;
+    background: #fff5f5;
+    padding: 14px 18px;
+    margin: 10px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+  }
+  .zoom-hint {
+    text-align: center;
+    color: #6c757d;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .tag-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🔧 第四节：Tools 定义与 Agent 行为</h1>
+
+<!-- Overview -->
+<div class="section">
+<h2>1. 工具全景</h2>
+
+<div class="mermaid">
+flowchart TB
+    subgraph ORCH["🎯 Orchestrator Agent"]
+        O["主 Agent<br/>按 Pipeline 顺序<br/>调用工具"]
+    end
+
+    subgraph T1["🔵 parse_pdf"]
+        T1D["PyMuPDF 文本提取<br/>+ 页码标注<br/><br/>📋 纯函数<br/>无 LLM 调用"]
+    end
+
+    subgraph T2["🟣 extract_claims"]
+        T2D["DeepSeek V4<br/>结构化提取<br/>Claims + Evidence<br/>+ 数值声明<br/><br/>🤖 LLM 调用<br/>Pydantic output_type"]
+    end
+
+    subgraph T3["🩷 dry_run_calc"]
+        T3D["公式转译（LLM）<br/>+ 安全执行（沙箱）<br/><br/>🤖 LLM + ⚡ exec<br/>白名单隔离"]
+    end
+
+    subgraph T4["🟢 validate_arm"]
+        T4D["Schema 校验<br/>Provenance 检查<br/>Hallucination 检测<br/><br/>📋 纯函数<br/>无 LLM 调用"]
+    end
+
+    O --> T1 --> T2 --> T3 --> T4
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<table>
+  <tr><th>工具</th><th>类型</th><th>LLM</th><th>阶段</th><th>主要风险</th></tr>
+  <tr>
+    <td><code>parse_pdf</code></td>
+    <td><span class="badge badge-pure">纯函数</span></td>
+    <td>无</td>
+    <td>1. Ingest</td>
+    <td>扫描版 PDF 无文本层</td>
+  </tr>
+  <tr>
+    <td><code>extract_claims</code></td>
+    <td><span class="badge badge-llm">LLM 工具</span></td>
+    <td>DeepSeek V4</td>
+    <td>2. Extract</td>
+    <td>幻觉、遗漏、token 超限</td>
+  </tr>
+  <tr>
+    <td><code>dry_run_calc</code></td>
+    <td><span class="badge badge-llm">混合</span></td>
+    <td>DeepSeek V4（仅公式转译）</td>
+    <td>3. Compute</td>
+    <td>公式转译错误、沙箱逃逸</td>
+  </tr>
+  <tr>
+    <td><code>validate_arm</code></td>
+    <td><span class="badge badge-pure">纯函数</span></td>
+    <td>无</td>
+    <td>4. Validate</td>
+    <td>漏检（fuzzy match 阈值不完美）</td>
+  </tr>
+</table>
+</div>
+
+<!-- Tool 1: parse_pdf -->
+<div class="section">
+<div class="tool-card t1">
+<div class="tool-header">
+  <div class="tool-icon">📄</div>
+  <div>
+    <h2 style="margin:0;font-size:20px">Tool 1：parse_pdf</h2>
+    <span class="badge badge-pure">纯函数 · 无 LLM</span>
+  </div>
+</div>
+
+<h3>接口签名</h3>
+<div class="code-block">
+<span class="kw">from</span> agents <span class="kw">import</span> function_tool
+
+<span class="deco">@function_tool</span>
+<span class="kw">def</span> <span class="fn">parse_pdf</span>(file_path: <span class="ty">str</span>) -> <span class="ty">ParsedPaper</span>:
+    <span class="cmt">"""解析 PDF 论文，提取带页码标注的结构化文本。</span>
+<span class="cmt"></span>
+<span class="cmt">    Args:</span>
+<span class="cmt">        file_path: PDF 文件的绝对路径</span>
+<span class="cmt"></span>
+<span class="cmt">    Returns:</span>
+<span class="cmt">        ParsedPaper: 包含 pages (文本+页码) 和 metadata</span>
+<span class="cmt"></span>
+<span class="cmt">    Raises:</span>
+<span class="cmt">        IngestError: PDF 损坏、无文本层或页数超限</span>
+<span class="cmt">    """</span>
+    <span class="kw">import</span> fitz
+    doc = fitz.<span class="fn">open</span>(file_path)
+    pages = []
+    <span class="kw">for</span> i, page <span class="kw">in</span> <span class="fn">enumerate</span>(doc):
+        blocks = page.<span class="fn">get_text</span>(<span class="str">"blocks"</span>)
+        text = <span class="str">"\n"</span>.<span class="fn">join</span>(
+            b[<span class="num">4</span>] <span class="kw">for</span> b <span class="kw">in</span> blocks
+            <span class="kw">if</span> b[<span class="num">6</span>] == <span class="num">0</span>  <span class="cmt"># block_type == text</span>
+        )
+        pages.<span class="fn">append</span>(Page(
+            number=i + <span class="num">1</span>,
+            text=text,
+            blocks=[...]
+        ))
+    <span class="kw">return</span> ParsedPaper(
+        pages=pages,
+        metadata=<span class="fn">_extract_metadata</span>(doc),
+        raw_text=<span class="str">"\n\n"</span>.<span class="fn">join</span>(p.text <span class="kw">for</span> p <span class="kw">in</span> pages)
+    )
+</div>
+
+<h3>被调用方式</h3>
+<div class="code-block">
+<span class="cmt"># Orchestrator 在 Ingest 阶段调用</span>
+<span class="kw">def</span> <span class="fn">run_ingest</span>(paper_path: <span class="ty">Path</span>) -> <span class="ty">ParsedPaper</span>:
+    result = <span class="fn">parse_pdf</span>(<span class="fn">str</span>(paper_path))
+    <span class="kw">if</span> <span class="kw">not</span> result.pages:
+        <span class="kw">raise</span> <span class="ty">IngestError</span>(<span class="str">"no_text_layer"</span>)
+    <span class="kw">return</span> result
+</div>
+
+<h3>错误表</h3>
+<table>
+  <tr><th>错误</th><th>触发</th><th>Agent 行为</th></tr>
+  <tr><td><code>corrupted_pdf</code></td><td>fitz.open 抛异常</td><td>终止 Pipeline，UI 显示"PDF 无法打开"</td></tr>
+  <tr><td><code>no_text_layer</code></td><td>所有 page 的 text 为空</td><td>终止 Pipeline，提示替换为文字版 PDF</td></tr>
+  <tr><td><code>page_limit</code></td><td>页数 > 50</td><td>截取前 50 页，warning 写入 provenance</td></tr>
+</table>
+</div>
+
+<!-- Tool 2: extract_claims -->
+<div class="tool-card t2">
+<div class="tool-header">
+  <div class="tool-icon">🧠</div>
+  <div>
+    <h2 style="margin:0;font-size:20px">Tool 2：extract_claims</h2>
+    <span class="badge badge-llm">LLM 工具 · DeepSeek V4</span>
+  </div>
+</div>
+
+<h3>接口签名</h3>
+<div class="code-block">
+<span class="deco">@function_tool</span>
+<span class="kw">def</span> <span class="fn">extract_claims</span>(
+    paper: <span class="ty">ParsedPaper</span>,
+    target_claims: <span class="ty">int</span> = <span class="num">5</span>
+) -> <span class="ty">ExtractionResult</span>:
+    <span class="cmt">"""从论文中提取科学结论、证据和数值声明。</span>
+<span class="cmt"></span>
+<span class="cmt">    LLM 指令见 prompts/extract_claims.md</span>
+<span class="cmt">    使用 Agents SDK 的 output_type=ExtractionResult</span>
+<span class="cmt">    确保结构化输出符合 Pydantic schema。</span>
+<span class="cmt"></span>
+<span class="cmt">    Args:</span>
+<span class="cmt">        paper: parse_pdf 的输出</span>
+<span class="cmt">        target_claims: 最少提取的 claim 数（默认 5）</span>
+<span class="cmt"></span>
+<span class="cmt">    Returns:</span>
+<span class="cmt">        ExtractionResult: claims, evidence, numerical_statements,</span>
+<span class="cmt">                         protocol, limitations</span>
+<span class="cmt">    """</span>
+</div>
+
+<h3>Agent 调用此工具的流程</h3>
+<div class="mermaid">
+flowchart TD
+    A["📥 ParsedPaper 传入"] --> B["Orchestrator 构造 prompt<br/>注入 paper.text + 页码信息"]
+    B --> C["Runner.run_sync(agent, prompt)<br/>output_type=ExtractionResult"]
+    C --> D{"返回结果检查"}
+    D -->|"claims < 5"| E["🔁 二次扫描<br/>针对未覆盖章节<br/>追加提取"]
+    D -->|"claims ≥ 5"| F["✅ 传入 Compute 阶段"]
+    E --> D
+
+    style E fill:#fff3cd,stroke:#ffc107
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>Token 管理策略</h3>
+<div class="risk-card">
+  <strong>风险：</strong>全文一次性输入可能超过 DeepSeek V4 上下文窗口。<br/><br/>
+  <strong>缓解：</strong>
+  <ul style="margin-bottom:0">
+    <li>先传摘要 + 标题 + 关键词做第一轮提取</li>
+    <li>如果 claims 不够 5 条或 LLM 要求更多上下文，逐章传入</li>
+    <li>最终组装所有分章结果为完整 ExtractionResult</li>
+  </ul>
+</div>
+
+<h3>错误处理</h3>
+<table>
+  <tr><th>情况</th><th>Agent 行为</th></tr>
+  <tr><td>LLM 返回 claims < 5</td><td>二次扫描未被覆盖的章节，仍不足则在 limitations 中记录"论文结论密度低"</td></tr>
+  <tr><td>某 claim 缺 evidence</td><td>extraction_method 设为 review_required，不编造</td></tr>
+  <tr><td>LLM API 超时/限流</td><td>重试 3 次（指数退避），仍失败则终止并保留已提取的部分结果</td></tr>
+  <tr><td>返回的 quoted_text 不在原文中</td><td>Extract 阶段不拦截，由 Validate 阶段检测并标记</td></tr>
+</table>
+</div>
+
+<!-- Tool 3: dry_run_calc -->
+<div class="tool-card t3">
+<div class="tool-header">
+  <div class="tool-icon">⚡</div>
+  <div>
+    <h2 style="margin:0;font-size:20px">Tool 3：dry_run_calc</h2>
+    <span class="badge badge-llm">混合 · LLM 转译 + 沙箱执行</span>
+  </div>
+</div>
+
+<h3>接口签名</h3>
+<div class="code-block">
+<span class="deco">@function_tool</span>
+<span class="kw">def</span> <span class="fn">dry_run_calc</span>(
+    statement: <span class="ty">NumericalStatement</span>,
+    tolerance: <span class="ty">float</span> = <span class="num">0.05</span>
+) -> <span class="ty">DryRunResult</span>:
+    <span class="cmt">"""安全执行数值声明的计算验证。</span>
+<span class="cmt"></span>
+<span class="cmt">    步骤：</span>
+<span class="cmt">    1. LLM 将 statement.formula_nl 转为 Python 表达式</span>
+<span class="cmt">    2. 将 statement.parameters 绑定为 Python 变量</span>
+<span class="cmt">    3. 在白名单沙箱中 exec Python 表达式</span>
+<span class="cmt">    4. 与 statement.reported_value 对比</span>
+<span class="cmt"></span>
+<span class="cmt">    Args:</span>
+<span class="cmt">        statement: 从 Extract 阶段来的数值声明</span>
+<span class="cmt">        tolerance: 允许的相对偏差（默认 0.05 = 5%）</span>
+<span class="cmt"></span>
+<span class="cmt">    Returns:</span>
+<span class="cmt">        DryRunResult: status + computed_value + deviation_pct</span>
+<span class="cmt">    """</span>
+</div>
+
+<h3>执行流程</h3>
+<div class="mermaid">
+flowchart TD
+    NS["📥 NumericalStatement<br/>formula_nl + params + reported_value"]
+
+    S1["步骤 1：公式转译（LLM）<br/>'λ = √(D/D*)'<br/>→ python_expr = 'sqrt(D / D_star)'"]
+    S1E{"转译成功?"}
+    S1E -->|"✗"| ERR1["calculation_error<br/>reason: formula_unparseable"]
+
+    S2["步骤 2：参数绑定<br/>params → Python 变量<br/>D=7.6e-6, D_star=2.9e-6"]
+    S2E{"参数齐全?"}
+    S2E -->|"✗"| ERR2["insufficient_data<br/>reason: missing_params"]
+
+    S3["步骤 3：沙箱执行<br/>白名单 exec()<br/>timeout=5s"]
+    S3E{"执行成功?"}
+    S3E -->|"✗"| ERR3["calculation_error<br/>reason: runtime_error"]
+
+    S4["步骤 4：结果对比<br/>|computed - reported|/reported"]
+    S4E{"偏差 < tolerance?"}
+    S4E -->|"✓"| PASS["✅ passed"]
+    S4E -->|"✗"| MIS["⚠ mismatch"]
+
+    NS --> S1 --> S1E
+    S1E -->|"✓"| S2 --> S2E
+    S2E -->|"✓"| S3 --> S3E
+    S3E -->|"✓"| S4 --> S4E
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<h3>沙箱实现</h3>
+<div class="code-block">
+<span class="kw">import</span> math
+<span class="kw">from</span> typing <span class="kw">import</span> Any
+
+<span class="cmt"># 白名单：只允许这些内置函数和模块</span>
+_ALLOWED_BUILTINS = {
+    <span class="str">"abs"</span>: <span class="fn">abs</span>, <span class="str">"round"</span>: <span class="fn">round</span>,
+    <span class="str">"min"</span>: <span class="fn">min</span>, <span class="str">"max"</span>: <span class="fn">max</span>,
+    <span class="str">"sum"</span>: <span class="fn">sum</span>, <span class="str">"len"</span>: <span class="fn">len</span>,
+    <span class="str">"range"</span>: <span class="fn">range</span>, <span class="str">"list"</span>: <span class="fn">list</span>,
+    <span class="str">"float"</span>: <span class="fn">float</span>, <span class="str">"int"</span>: <span class="fn">int</span>,
+    <span class="str">"True"</span>: <span class="kw">True</span>, <span class="str">"False"</span>: <span class="kw">False</span>,
+    <span class="str">"None"</span>: <span class="kw">None</span>,
+}
+
+_ALLOWED_MODULES = {<span class="str">"math"</span>: math}
+
+<span class="kw">def</span> <span class="fn">safe_exec</span>(expr: <span class="ty">str</span>, params: <span class="ty">dict</span>) -> <span class="ty">float</span>:
+    <span class="cmt">"""在白名单沙箱中执行 Python 表达式"""</span>
+    safe_globals = {
+        <span class="str">"__builtins__"</span>: _ALLOWED_BUILTINS,
+        **_ALLOWED_MODULES,
+        **params
+    }
+    safe_locals = {}
+    <span class="kw">try</span>:
+        result = <span class="fn">eval</span>(expr, safe_globals, safe_locals)
+        <span class="kw">return</span> <span class="fn">float</span>(result)
+    <span class="kw">except</span> Exception <span class="kw">as</span> e:
+        <span class="kw">raise</span> <span class="ty">SandboxError</span>(<span class="fn">str</span>(e))
+</div>
+</div>
+
+<!-- Tool 4: validate_arm -->
+<div class="tool-card t4">
+<div class="tool-header">
+  <div class="tool-icon">✅</div>
+  <div>
+    <h2 style="margin:0;font-size:20px">Tool 4：validate_arm</h2>
+    <span class="badge badge-pure">纯函数 · 无 LLM</span>
+  </div>
+</div>
+
+<h3>接口签名</h3>
+<div class="code-block">
+<span class="deco">@function_tool</span>
+<span class="kw">def</span> <span class="fn">validate_arm</span>(
+    arm: <span class="ty">ARM</span>,
+    paper: <span class="ty">ParsedPaper</span>  <span class="cmt"># 用于 hallucination 检测</span>
+) -> <span class="ty">ValidationReport</span>:
+    <span class="cmt">"""校验 ARM 的完整性、一致性和可追溯性。</span>
+<span class="cmt"></span>
+<span class="cmt">    6 条校验规则（详见第三节）：</span>
+<span class="cmt">    1. Schema 完整性（Pydantic 类型校验）</span>
+<span class="cmt">    2. Claim ≥ 5, Evidence ≥ 5</span>
+<span class="cmt">    3. 每条 Claim 关联 ≥ 1 Evidence</span>
+<span class="cmt">    4. Hallucination 检测（quoted_text vs 原文）</span>
+<span class="cmt">    5. Provenance 覆盖率</span>
+<span class="cmt">    6. 模型推断不冒充原文</span>
+<span class="cmt"></span>
+<span class="cmt">    Args:</span>
+<span class="cmt">        arm: 待校验的 ARM 对象（部分或完整填充）</span>
+<span class="cmt">        paper: 原文（用于规则 4 的文本匹配）</span>
+<span class="cmt"></span>
+<span class="cmt">    Returns:</span>
+<span class="cmt">        ValidationReport: 含 passed bool + 所有违规项</span>
+<span class="cmt">    """</span>
+</div>
+
+<h3>6 条规则实现摘要</h3>
+<table>
+  <tr><th>规则</th><th>实现</th><th>阻塞级别</th></tr>
+  <tr><td>R1: Schema 完整性</td><td><code>ARM.model_validate(arm)</code> 捕获 ValidationError</td><td><span class="badge badge-llm">CRITICAL</span></td></tr>
+  <tr><td>R2: 数量下限</td><td><code>len(claims) >= 5 and len(evidence) >= 5</code></td><td><span class="badge badge-llm">CRITICAL</span></td></tr>
+  <tr><td>R3: Claim-Evidence</td><td>遍历 claims，检查 <code>evidence_refs</code> 非空且指向存在的 evidence</td><td><span class="badge badge-llm">CRITICAL</span></td></tr>
+  <tr><td>R4: Hallucination</td><td>精确子串匹配 + fuzzy token overlap (threshold=0.6)</td><td><span class="badge badge-llm">CRITICAL</span></td></tr>
+  <tr><td>R5: Provenance</td><td>递归遍历 ARM 所有字段，检查有 source 的字段占比</td><td><span class="badge badge-pure">WARNING</span></td></tr>
+  <tr><td>R6: 推断标记</td><td>检查所有 <code>extraction_method == "llm_inferred"</code> 的字段是否已明确标记</td><td><span class="badge badge-llm">CRITICAL</span></td></tr>
+</table>
+</div>
+
+<!-- Agent Behavior -->
+<div class="section">
+<h2>2. Agent 行为：Orchestrator 主循环</h2>
+
+<div class="mermaid">
+flowchart TD
+    START["🚀 用户上传 PDF + 点击运行"] --> INIT["初始化状态<br/>paper_path, results={}"]
+
+    INIT --> S1["阶段 1：Ingest<br/>parse_pdf()"]
+    S1 --> S1C{"成功?"}
+    S1C -->|"✗"| ERR["❌ 终止 + 显示错误<br/>UI 展示具体原因"]
+    S1C -->|"✓"| S1S["💾 保存 ParsedPaper<br/>→ results['parsed']"]
+
+    S1S --> S2["阶段 2：Extract<br/>extract_claims()"]
+    S2 --> S2C{"成功?"}
+    S2C -->|"✗"| ERR
+    S2C -->|"✓"| S2S["💾 保存 ExtractionResult<br/>→ results['extraction']"]
+
+    S2S --> S3["阶段 3：Compute<br/>dry_run_calc() × N"]
+    S3 --> S3S["💾 保存 DryRunResult[]<br/>→ results['dry_runs']"]
+
+    S3S --> S4["阶段 4：Validate<br/>validate_arm()"]
+    S4 --> S4S["💾 保存 ValidationReport<br/>→ results['validation']"]
+
+    S4S --> S4C{"passed?"}
+    S4C -->|"✓"| S5["阶段 5：Export<br/>生成 4 个输出文件"]
+    S4C -->|"✗"| S4R["⚠ 标记 review_required<br/>仍可导出，但 ARM 中<br/>标注未通过项"]
+    S4R --> S5
+
+    S5 --> DONE["🎉 UI 展示 ARM<br/>+ Dry-run 结果<br/>+ 下载链接"]
+
+    style ERR fill:#f8d7da,stroke:#dc3545
+    style DONE fill:#d1e7dd,stroke:#198754
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+</div>
+
+<!-- Future: Agentic Loop -->
+<div class="section">
+<h2>3. 预留接口：Agentic Self-Check 循环 <span class="badge badge-future">v1.1 规划</span></h2>
+
+<div class="decision-card">
+  <strong>设计原则：</strong>v1.0 用确定性 Pipeline 确保七日交付。但架构在 Validate 阶段预留了循环接口，逻辑验证后可以无缝升级为"校验失败 → 回到 Extract 重新提取"的 Agentic 模式。
+</div>
+
+<h3>预留接口定义</h3>
+<div class="code-block">
+<span class="kw">class</span> <span class="ty">PipelineState</span>(<span class="ty">BaseModel</span>):
+    <span class="cmt">"""跨阶段的全局状态（v1.0 用，v1.1 扩展）"""</span>
+    paper_path: <span class="ty">str</span>
+    parsed: <span class="ty">ParsedPaper</span> | <span class="kw">None</span> = <span class="kw">None</span>
+    extraction: <span class="ty">ExtractionResult</span> | <span class="kw">None</span> = <span class="kw">None</span>
+    dry_runs: <span class="ty">list</span>[<span class="ty">DryRunResult</span>] = []
+
+    <span class="cmt"># v1.1 新增</span>
+    retry_count: <span class="ty">int</span> = <span class="num">0</span>            <span class="cmt"># 当前重试次数</span>
+    max_retries: <span class="ty">int</span> = <span class="num">3</span>           <span class="cmt"># 最大重试次数</span>
+    last_validation: <span class="ty">ValidationReport</span> | <span class="kw">None</span> = <span class="kw">None</span>
+
+    <span class="kw">def</span> <span class="fn">should_retry</span>(self) -> <span class="ty">bool</span>:
+        <span class="cmt">"""判断是否需要 agentic 重试"""</span>
+        <span class="kw">if</span> self.retry_count >= self.max_retries:
+            <span class="kw">return</span> <span class="kw">False</span>
+        <span class="kw">if</span> self.last_validation <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">return</span> <span class="kw">False</span>
+        <span class="cmt"># 仅对 hallucination 和 claim-evidence gap 重试</span>
+        has_fixable = (
+            self.last_validation.hallucination_flags
+            <span class="kw">or</span> self.last_validation.claim_evidence_gaps
+        )
+        <span class="kw">return</span> has_fixable
+</div>
+
+<h3>v1.0 → v1.1 升级路径</h3>
+<div class="mermaid">
+flowchart LR
+    subgraph V1["v1.0：线性 Pipeline"]
+        direction LR
+        A1["Ingest"] --> A2["Extract"] --> A3["Compute"] --> A4["Validate"] --> A5["Export"]
+    end
+
+    subgraph V2["v1.1：Agentic Loop"]
+        direction LR
+        B1["Ingest"] --> B2["Extract"]
+        B2 --> B3["Compute"]
+        B3 --> B4["Validate"]
+        B4 -->|"hallucination / gap"| B2
+        B4 -->|"passed"| B5["Export"]
+    end
+
+    V1 -.->|"加一根回边"| V2
+</div>
+<div class="zoom-hint">💡 滚轮缩放 | 拖动平移</div>
+
+<div class="decision-card" style="margin-top:16px">
+  <strong>升级改动量：</strong>只需修改 Orchestrator 中 Validate 之后的分支逻辑（约 20 行），Pipeline 阶段代码和工具接口无需改动。这就是合约设计的好处——Validate 的 Postcondition 无论 v1.0 还是 v1.1 都一样。
+</div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+  });
+  document.querySelectorAll('.mermaid').forEach(el => {
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      const svg = el.querySelector('svg');
+      if (!svg) return;
+      const scale = parseFloat(svg.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || 1);
+      const newScale = Math.max(0.3, Math.min(3, scale + (e.deltaY > 0 ? -0.1 : 0.1)));
+      svg.style.transform = `scale(${newScale})`;
+      svg.style.transformOrigin = 'top left';
+    });
+  });
+</script>
+
+</body>
+</html>
