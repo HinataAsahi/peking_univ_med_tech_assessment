@@ -122,7 +122,7 @@ def search_europepmc(
     """
     import json
 
-    full_query = f"({query}) AND (FIRST_PDATE:[{years[:4]}-01-01 TO {years[5:]}-12-31])"
+    full_query = f"({query}) AND (FIRST_PDATE:[{years[:4]}-01-01 TO {years[5:]}-12-31]) AND (OPEN_ACCESS:Y)"
     results = SearchResults(query=full_query)
 
     try:
@@ -131,7 +131,6 @@ def search_europepmc(
             f"?query={urllib.request.quote(full_query)}"
             f"&format=json&resultType=core"
             f"&pageSize={max_results}"
-            f"&sort=RELEVANCE"
         )
         resp = urllib.request.urlopen(url, timeout=15)
         data = json.loads(resp.read().decode())
@@ -145,15 +144,36 @@ def search_europepmc(
         doi = item.get("doi", "")
         pmid = item.get("pmid", "") or item.get("id", "")
 
-        # Europe PMC 直接提供 OA PDF 链接
+        # Europe PMC 直接提供 OA PDF 链接（在 fullTextUrlList 中）
         pdf_url = ""
-        has_pdf = item.get("hasPDF", False)
-        full_text_list = item.get("fullTextUrlList", [])
-        if full_text_list:
-            for ft in full_text_list:
-                if ft.get("documentStyle") == "pdf":
-                    pdf_url = ft.get("url", "")
+        has_pdf_val = item.get("hasPDF", "N")
+        has_pdf = has_pdf_val == "Y" if isinstance(has_pdf_val, str) else bool(has_pdf_val)
+
+        # fullTextUrlList 是 dict: {"fullTextUrl": [{...}, {...}]}
+        full_text_wrapper = item.get("fullTextUrlList", {})
+        if isinstance(full_text_wrapper, dict):
+            full_text_list = full_text_wrapper.get("fullTextUrl", [])
+        else:
+            full_text_list = full_text_list if isinstance(full_text_list, list) else []
+
+        # 从 fullTextUrlList 中找 PDF：site=Europe_PMC, style=pdf, avail=Open access
+        for ft in full_text_list:
+            if not isinstance(ft, dict):
+                continue
+            avail = ft.get("availability", "")
+            if "open" not in avail.lower():
+                continue
+            if ft.get("documentStyle") == "pdf":
+                pdf_url = ft.get("url", "")
+                if pdf_url:
                     break
+            # Fallback: HTML URL for PMC papers
+            if ft.get("documentStyle") == "html" and "europepmc.org" in ft.get("url", ""):
+                # 将 HTML URL 转为 PDF URL
+                pdf_url = ft.get("url", "").replace("?page=1", "?pdf=render")
+                if "pdf=render" not in pdf_url:
+                    pdf_url = pdf_url.rstrip("/") + "?pdf=render"
+                break
 
         abstract = item.get("abstractText", "")
         # 去掉 HTML 标签
@@ -171,7 +191,7 @@ def search_europepmc(
             abstract=abstract,
             has_pdf=has_pdf,
             pdf_url=pdf_url,
-            is_open_access=has_pdf,
+            is_open_access=(item.get("isOpenAccess", "N") == "Y"),
         ))
 
     return results
@@ -265,7 +285,9 @@ def check_open_access(doi: str) -> dict:
 
 
 def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
-    """下载 PDF 文件到指定目录。
+    """下载论文内容到指定目录。
+
+    优先尝试 NCBI PMC PDF，失败则返回空字符串（不保存无内容的假文件）。
 
     Returns:
         下载后的文件路径，失败返回空字符串
@@ -276,13 +298,24 @@ def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
     out_path = Path(output_dir) / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Europe PMC render URL → 转为 NCBI PMC direct PDF
+    download_url = pdf_url
+    if "europepmc.org" in pdf_url and "pdf=render" in pdf_url:
+        pmcid = pdf_url.split("/")[-1].split("?")[0]  # e.g., PMC12957555
+        download_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/main.pdf"
+
     try:
         req = urllib.request.Request(
-            pdf_url,
-            headers={"User-Agent": "ECS-Paper-to-ARM/1.0 (mailto:student@example.com)"}
+            download_url,
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
+
+        # 验证是 PDF 而非 HTML 重定向页面
+        if data[:4] != b"%PDF":
+            return ""
+
         with open(out_path, "wb") as f:
             f.write(data)
         return str(out_path)
@@ -294,25 +327,24 @@ def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
 
 ECS_QUERIES = {
     "review": (
-        '"extracellular space"[Title/Abstract] AND "brain"[Title/Abstract] '
-        'AND ("volume fraction" OR "tortuosity" OR "diffusion")'
+        'TITLE_ABS:"extracellular space" AND TITLE_ABS:"brain"'
+        ' AND ("volume fraction" OR tortuosity OR diffusion)'
     ),
     "method_iontophoresis": (
-        '"extracellular space"[Title/Abstract] AND "brain"[Title/Abstract] '
-        'AND ("iontophoresis" OR "TMA" OR "diffusion measurement" OR '
-        '"integrative optical imaging")'
+        'TITLE_ABS:"extracellular space" AND ("iontophoresis" OR "TMA"'
+        ' OR "diffusion measurement" OR "integrative optical imaging")'
     ),
     "method_imaging": (
-        '"brain extracellular space"[Title/Abstract] AND '
-        '("imaging" OR "microscopy" OR "super-resolution" OR "tracer")'
+        'TITLE_ABS:"brain extracellular space"'
+        ' AND (imaging OR microscopy OR "super-resolution" OR tracer)'
     ),
     "disease_ischemia": (
-        '"extracellular space"[Title/Abstract] AND "brain"[Title/Abstract] '
-        'AND ("ischemia" OR "edema" OR "stroke" OR "spreading depression")'
+        'TITLE_ABS:"extracellular space" AND "brain"'
+        ' AND (ischemia OR edema OR stroke OR "spreading depression")'
     ),
     "clearance_glymphatic": (
-        '("glymphatic"[Title/Abstract] OR "perivascular transport"[Title/Abstract] '
-        'OR "brain clearance"[Title/Abstract])'
+        '(TITLE_ABS:glymphatic OR TITLE_ABS:"perivascular transport"'
+        ' OR TITLE_ABS:"brain clearance")'
     ),
 }
 
