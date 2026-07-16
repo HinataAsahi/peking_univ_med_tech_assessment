@@ -105,7 +105,7 @@ def search_pubmed(
 def search_europepmc(
     query: str,
     max_results: int = 10,
-    years: str = "2023:2026",
+    years: str = "2023:2025",
 ) -> SearchResults:
     """通过 Europe PMC REST API 搜索论文。
 
@@ -285,12 +285,10 @@ def check_open_access(doi: str) -> dict:
 
 
 def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
-    """下载论文内容到指定目录。
+    """直接下载 PDF（URL 来自 Europe PMC 元数据的 fullTextUrlList）。
 
-    优先尝试 NCBI PMC PDF，失败则返回空字符串（不保存无内容的假文件）。
-
-    Returns:
-        下载后的文件路径，失败返回空字符串
+    不转换 URL——直接用元数据提供的链接下载。
+    失败返回空字符串。
     """
     if not pdf_url:
         return ""
@@ -298,21 +296,15 @@ def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
     out_path = Path(output_dir) / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Europe PMC render URL → 转为 NCBI PMC direct PDF
-    download_url = pdf_url
-    if "europepmc.org" in pdf_url and "pdf=render" in pdf_url:
-        pmcid = pdf_url.split("/")[-1].split("?")[0]  # e.g., PMC12957555
-        download_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/main.pdf"
-
     try:
         req = urllib.request.Request(
-            download_url,
+            pdf_url,
             headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
 
-        # 验证是 PDF 而非 HTML 重定向页面
+        # 验证是 PDF 而非 HTML
         if data[:4] != b"%PDF":
             return ""
 
@@ -321,6 +313,109 @@ def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
         return str(out_path)
     except Exception:
         return ""
+
+
+def download_pdf_from_doi(doi: str, output_dir: str, filename: str) -> str:
+    """通过 DOI 从出版商网站查找并下载 PDF。
+
+    流程：DOI → 出版商页面 → 提取 PDF 链接或尝试常见 PDF URL 模式。
+
+    Returns:
+        下载后的文件路径，失败返回空字符串
+    """
+    if not doi:
+        return ""
+
+    out_path = Path(output_dir) / filename
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+
+    # 策略 A：尝试常见出版商 PDF URL 模式
+    pdf_patterns = [
+        f"https://doi.org/{doi}",
+        f"https://doi.org/{doi}?pdf=render",
+        # Science Partner Journal / AAAS
+        f"https://spj.science.org/doi/pdf/{doi}",
+        # Nature / Springer
+        f"https://www.nature.com/articles/{doi.split('/')[-1]}.pdf",
+        # Frontiers
+        f"https://www.frontiersin.org/articles/{doi}/pdf",
+        # MDPI
+        f"https://www.mdpi.com/*/*/{doi.split('/')[-1]}/pdf",
+        # eLife
+        f"https://elifesciences.org/articles/{doi.split('/')[-1]}.pdf",
+        # PLOS
+        f"https://journals.plos.org/plosone/article/file?id={doi}&type=printable",
+        # BioMed Central / SpringerOpen
+        f"https://link.springer.com/content/pdf/{doi}.pdf",
+    ]
+
+    for url in pdf_patterns:
+        if "*" in url:
+            continue  # 跳过含通配符的模式
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = resp.read()
+            if data[:4] == b"%PDF":
+                with open(out_path, "wb") as f:
+                    f.write(data)
+                return str(out_path)
+        except Exception:
+            continue
+
+    # 策略 B：解析 DOI 重定向页面，提取 PDF 链接
+    try:
+        doi_url = f"https://doi.org/{doi}"
+        req = urllib.request.Request(doi_url, headers=headers)
+        resp = urllib.request.urlopen(req, timeout=15)
+        page_html = resp.read().decode("utf-8", errors="ignore")
+
+        # 在 HTML 中搜索 PDF 链接
+        import re
+        pdf_matches = re.findall(
+            r'https?://[^\s"\'<>]+\.pdf[^\s"\'<>]*',
+            page_html,
+            re.IGNORECASE,
+        )
+        seen = set()
+        for pdf_url in pdf_matches:
+            if pdf_url in seen:
+                continue
+            seen.add(pdf_url)
+            try:
+                req2 = urllib.request.Request(pdf_url, headers=headers)
+                resp2 = urllib.request.urlopen(req2, timeout=30)
+                data2 = resp2.read()
+                if data2[:4] == b"%PDF" and len(data2) > 10000:
+                    with open(out_path, "wb") as f:
+                        f.write(data2)
+                    return str(out_path)
+            except Exception:
+                continue
+
+        # 在 HTML 中搜索 meta citation_pdf_url
+        meta_match = re.search(
+            r'<meta[^>]+name="citation_pdf_url"[^>]+content="([^"]+)"',
+            page_html,
+        )
+        if meta_match:
+            pdf_url = meta_match.group(1)
+            try:
+                req3 = urllib.request.Request(pdf_url, headers=headers)
+                resp3 = urllib.request.urlopen(req3, timeout=30)
+                data3 = resp3.read()
+                if data3[:4] == b"%PDF":
+                    with open(out_path, "wb") as f:
+                        f.write(data3)
+                    return str(out_path)
+            except Exception:
+                pass
+
+    except Exception:
+        pass
+
+    return ""
 
 
 # ── 预置 ECS 搜索查询 ──────────────────────────────────────────
@@ -395,14 +490,24 @@ def search_and_download_ecs_papers(
 
             all_papers.append(paper)
 
-            # 下载
+            # 下载：先试 Europe PMC PDF 链接，再试 DOI → 出版商
+            safe_title = paper.title[:80].replace("/", "_").replace(":", "_").replace("'", "")
+            safe_doi = paper.doi.replace("/", "_").replace(".", "_") if paper.doi else "no_doi"
+            fname = f"{category}_{safe_doi}_{safe_title}.pdf"
+
             if auto_download and paper.pdf_url:
-                safe_title = paper.title[:80].replace("/", "_").replace(":", "_")
-                fname = f"{category}_{paper.doi.replace('/', '_')}_{safe_title}.pdf"
                 path = download_pdf(paper.pdf_url, output_dir, fname)
                 if path:
                     downloaded.append(path)
+                    time.sleep(0.3)
+                    continue
+
+            # Fallback: DOI → 出版商 PDF
+            if auto_download and paper.doi:
                 time.sleep(0.3)
+                path = download_pdf_from_doi(paper.doi, output_dir, fname)
+                if path:
+                    downloaded.append(path)
 
         if backend == "pubmed":
             time.sleep(0.5)  # NCBI rate limit
