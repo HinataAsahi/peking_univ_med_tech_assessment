@@ -33,57 +33,17 @@ st.markdown("""
   --ink: #334155;
 }
 
-.stApp { background: var(--bg); }
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-h1, h2, h3 { color: var(--slate) !important; font-weight: 700 !important; }
 h1 { font-size: 1.5rem !important; letter-spacing: -0.03em; }
 h2 { font-size: 1.15rem !important; margin-top: 2rem !important; }
-h3 { font-size: 0.95rem !important; color: var(--ink) !important; }
+h3 { font-size: 0.95rem !important; }
 code { font-family: 'JetBrains Mono', monospace !important; font-size: 0.82rem; }
 
-/* Sidebar: light, unified with main */
-[data-testid="stSidebar"] {
-  background: #F1F5F9;
-  border-right: 1px solid var(--border);
-}
-[data-testid="stSidebar"] .stMarkdown,
-[data-testid="stSidebar"] label { color: var(--ink) !important; }
-[data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-  color: var(--slate) !important; font-weight: 600 !important;
-}
-[data-testid="stSidebar"] [data-testid="stTextInput"] input {
-  background: white; border: 1px solid var(--border); color: var(--text); border-radius: 6px;
-}
-
-/* Metric cards */
-[data-testid="stMetric"] {
-  background: white; border-radius: 6px; padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-}
-[data-testid="stMetric"] label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-[data-testid="stMetricValue"] { color: var(--slate); font-size: 1.1rem; }
-
-/* Buttons */
-.stButton > button {
-  border-radius: 6px; font-weight: 600; font-size: 0.875rem; transition: all 0.15s; border: none;
-}
-.stButton > button:hover { filter: brightness(0.95); }
-
-/* Progress */
-[data-testid="stProgress"] > div > div { background: var(--indigo); }
-
-/* Expanders */
-[data-testid="stExpander"] {
-  border: 1px solid var(--border); border-radius: 6px;
-  margin-bottom: 0.4rem; background: white;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-}
+[data-testid="stMetric"] label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+[data-testid="stMetricValue"] { font-size: 1.1rem; }
+.stButton > button { border-radius: 6px; font-weight: 600; font-size: 0.875rem; }
 [data-testid="stExpander"] summary { font-weight: 500; }
-
-/* Tabs */
 [data-testid="stTabs"] [data-baseweb="tab"] { font-weight: 500; }
-
-hr { border-color: var(--border); margin: 1.5rem 0; }
 
 /* Pipeline indicator */
 .stage-dot {
