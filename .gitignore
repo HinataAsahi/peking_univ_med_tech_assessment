@@ -19,3 +19,8 @@ Thumbs.db
 *.pdf
 output/
 *.log
+
+# Report-generated files (keep local, don't commit)
+docs/hackathon_report.html
+docs/dry_run_chart.png
+docs/pipeline_flow.svg
