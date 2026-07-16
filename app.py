@@ -18,84 +18,114 @@ st.set_page_config(
 # ── Custom CSS ───────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── Palette: neuroscience dark-field + fluorescent tracer ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Palette: scientific instrument panel ── */
 :root {
-  --navy: #0D1B2A;
-  --teal: #00E5A0;
-  --surface: #ffffff;
-  --bg: #F5F7FA;
-  --text: #1A1A2E;
-  --muted: #6B7280;
-  --warn: #F59E0B;
-  --danger: #EF4444;
+  --slate: #0F172A;
+  --green: #10B981;
+  --amber: #F59E0B;
+  --red: #EF4444;
+  --indigo: #6366F1;
+  --surface: #FFFFFF;
+  --bg: #F8FAFC;
+  --border: #E2E8F0;
+  --text: #1E293B;
+  --muted: #94A3B8;
+  --ink: #334155;
 }
 
 /* ── Global ── */
 .stApp { background: var(--bg); }
-h1, h2, h3 { color: var(--navy) !important; font-weight: 700 !important; }
-h1 { font-size: 1.75rem !important; letter-spacing: -0.02em; }
-h2 { font-size: 1.25rem !important; margin-top: 2rem !important; }
-h3 { font-size: 1rem !important; }
+* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+h1, h2, h3 { color: var(--slate) !important; font-weight: 700 !important; }
+h1 { font-size: 1.5rem !important; letter-spacing: -0.03em; }
+h2 { font-size: 1.15rem !important; margin-top: 2rem !important; font-weight: 600 !important; }
+h3 { font-size: 0.95rem !important; color: var(--ink) !important; }
+code, .stCode, [data-testid="stCode"] { font-family: 'JetBrains Mono', monospace !important; font-size: 0.82rem; }
 
-/* ── Sidebar ── */
+/* ── Sidebar: clean slate ── */
 [data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #0D1B2A 0%, #1B2D45 100%);
+  background: var(--slate);
+  border-right: none;
 }
 [data-testid="stSidebar"] .stMarkdown,
 [data-testid="stSidebar"] label,
-[data-testid="stSidebar"] .stCaption { color: rgba(255,255,255,0.85) !important; }
-[data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: #00E5A0 !important; }
+[data-testid="stSidebar"] .stCaption { color: rgba(255,255,255,0.8) !important; }
+[data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+  color: #818CF8 !important; font-weight: 600 !important; letter-spacing: 0.02em;
+}
 [data-testid="stSidebar"] [data-testid="stTextInput"] input {
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  color: white; border-radius: 6px;
 }
 
-/* ── Cards ── */
-.stCard {
-  background: white; border-radius: 12px; padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #E5E7EB;
-  margin-bottom: 0.75rem;
-}
-
-/* ── Claim expander ── */
-[data-testid="stExpander"] {
-  border: 1px solid #E5E7EB; border-radius: 8px;
-  margin-bottom: 0.5rem; background: white;
-}
-
-/* ── Metric cards ── */
+/* ── Metric cards: instrument readout style ── */
 [data-testid="stMetric"] {
-  background: white; border-radius: 8px; padding: 0.75rem 1rem;
-  border: 1px solid #E5E7EB;
+  background: white; border-radius: 6px; padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
-[data-testid="stMetric"] label { font-size: 0.75rem; color: var(--muted); }
-[data-testid="stMetricValue"] { color: var(--navy); }
+[data-testid="stMetric"] label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+[data-testid="stMetricValue"] { color: var(--slate); font-size: 1.1rem; }
 
 /* ── Buttons ── */
 .stButton > button {
-  border-radius: 8px; font-weight: 600; transition: all 0.2s;
+  border-radius: 6px; font-weight: 600; font-size: 0.875rem;
+  transition: all 0.15s; border: none;
 }
-.stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.stButton > button:hover { filter: brightness(0.95); }
 
 /* ── Progress bar ── */
-[data-testid="stProgress"] > div > div { background: var(--teal); }
+[data-testid="stProgress"] > div > div { background: var(--indigo); }
 
-/* ── Pipeline stage tags ── */
-.stage-tag {
-  display: inline-block; padding: 2px 10px; border-radius: 12px;
-  font-size: 0.75rem; font-weight: 600; margin-right: 4px;
+/* ── Expanders (claim cards) ── */
+[data-testid="stExpander"] {
+  border: 1px solid var(--border); border-radius: 6px;
+  margin-bottom: 0.4rem; background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
-.stage-ingest { background: #E0E7FF; color: #3730A3; }
-.stage-extract { background: #EDE9FE; color: #6D28D9; }
-.stage-compute { background: #FCE7F3; color: #BE185D; }
-.stage-validate { background: #D1FAE5; color: #065F46; }
+[data-testid="stExpander"] summary { font-weight: 500; }
 
-/* ── Claim method badges ── */
-.claim-exact { background: #D1FAE5; color: #065F46; }
-.claim-inferred { background: #FEF3C7; color: #92400E; }
-.claim-review { background: #FEE2E2; color: #991B1B; }
+/* ── Tabs ── */
+[data-testid="stTabs"] [data-baseweb="tab"] {
+  font-weight: 500; font-size: 0.9rem;
+}
 
 /* ── Horizontal rule ── */
-hr { border-color: #E5E7EB; margin: 1.5rem 0; }
+hr { border-color: var(--border); margin: 1.5rem 0; }
+
+/* ── Pipeline stage indicator ── */
+.stage-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+}
+.dot-active { background: var(--indigo); box-shadow: 0 0 6px rgba(99,102,241,0.5); }
+.dot-done { background: var(--green); }
+.dot-pending { background: #CBD5E1; }
+
+/* ── Claim badge ── */
+.badge-exact { background: #D1FAE5; color: #065F46; }
+.badge-inferred { background: #FEF3C7; color: #92400E; }
+.badge-review { background: #FEE2E2; color: #991B1B; }
+
+/* ── Dry-run verification panel ── */
+.dryrun-panel {
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.25rem; margin: 0.5rem 0;
+}
+.dryrun-panel .formula { font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: var(--slate); }
+.dryrun-panel .result-pass { color: var(--green); font-weight: 700; }
+.dryrun-panel .result-fail { color: var(--red); font-weight: 700; }
+.dryrun-panel .result-insufficient { color: var(--amber); font-weight: 700; }
+
+/* ── Info/status boxes ── */
+.info-box {
+  background: white; border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.75rem 1rem; margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+.info-box .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -138,46 +168,36 @@ with st.sidebar:
 
 # ── Pipeline stage visual ────────────────────────────────────
 def show_pipeline_stages(active: int = -1):
-    """显示 5 阶段 Pipeline 进度条。active: -1=未开始, 0-4=当前阶段"""
-    stages = [
-        ("📄", "Ingest", "PDF → 文本"),
-        ("🧠", "Extract", "提取 Claims"),
-        ("⚡", "Compute", "Dry-run 验证"),
-        ("✅", "Validate", "Schema 校验"),
-        ("📦", "Export", "YAML/JSON"),
-    ]
+    """5 阶段指示器。active: -1=未开始, 0-4=当前, 5=全部完成"""
+    stages = ["Ingest", "Extract", "Compute", "Validate", "Export"]
     cols = st.columns(5)
-    for i, (icon, name, desc) in enumerate(stages):
+    for i, name in enumerate(stages):
         with cols[i]:
             if i < active:
-                bg = "#D1FAE5" if i < 4 else "#D1FAE5"
+                dot = '<span class="stage-dot dot-done"></span>'
                 color = "#065F46"
             elif i == active:
-                bg = "#FEF3C7"
-                color = "#92400E"
+                dot = '<span class="stage-dot dot-active"></span>'
+                color = "#6366F1"
             else:
-                bg = "#F3F4F6"
-                color = "#9CA3AF"
+                dot = '<span class="stage-dot dot-pending"></span>'
+                color = "#94A3B8"
             st.markdown(
-                f"""<div style="text-align:center;padding:0.5rem 0.25rem;
-                background:{bg};border-radius:8px;">
-                <div style="font-size:1.25rem;">{icon}</div>
-                <div style="font-size:0.7rem;font-weight:700;color:{color};">{name}</div>
-                <div style="font-size:0.6rem;color:{color};">{desc}</div>
+                f"""<div style="font-size:0.72rem;font-weight:600;color:{color};white-space:nowrap;">
+                {dot} {name}
                 </div>""",
                 unsafe_allow_html=True,
             )
 
 
 def badge(method: str) -> str:
-    """根据 extraction_method 返回 HTML badge"""
+    """extraction_method → HTML badge"""
     if method == "exact_quote":
-        cls, label = "claim-exact", "📎 原文"
+        return '<span class="badge-exact" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">引</span>'
     elif method == "llm_inferred":
-        cls, label = "claim-inferred", "🤖 推断"
+        return '<span class="badge-inferred" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">推</span>'
     else:
-        cls, label = "claim-review", "⚠️ 待复核"
-    return f'<span class="{cls}" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">{label}</span>'
+        return '<span class="badge-review" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;">审</span>'
 
 
 # ── Main ─────────────────────────────────────────────────────
@@ -331,23 +351,34 @@ with tab_analyze:
                             if c.evidence_refs:
                                 st.caption(f"📎 证据: {', '.join(c.evidence_refs)}")
 
-                    # ── Dry-runs ──
-                    st.markdown(f"### 🧮 Dry-run ({len(dry_runs)})")
+                    # ── Dry-runs (verification panel) ──
+                    st.markdown(f"### 🧮 计算验证 ({len(dry_runs)})")
                     if dry_runs:
-                        cols = st.columns(min(len(dry_runs), 4))
-                        for i, dr in enumerate(dry_runs):
-                            with cols[i % len(cols)]:
-                                status = dr.status.value
-                                icon_map = {
-                                    "passed": "✅", "mismatch": "⚠️",
-                                    "insufficient_data": "❓", "calculation_error": "✗",
-                                }
-                                st.metric(
-                                    f"{icon_map.get(status, '❌')} {dr.statement_id}",
-                                    f"{dr.computed_value}" if dr.computed_value is not None else "—",
-                                    delta=f"vs {dr.reported_value} ({dr.deviation_pct}%)" if dr.reported_value is not None else None,
-                                )
-                                st.caption(status)
+                        for dr in dry_runs:
+                            status = dr.status.value
+                            if status == "passed":
+                                icon, css_class = "✓", "result-pass"
+                            elif status == "mismatch":
+                                icon, css_class = "⚠", "result-fail"
+                            else:
+                                icon, css_class = "?", "result-insufficient"
+
+                            computed = f"{dr.computed_value:.4g}" if dr.computed_value is not None else "—"
+                            reported = f"{dr.reported_value:.4g}" if dr.reported_value is not None else "—"
+                            dev = f"{dr.deviation_pct:.1f}%" if dr.deviation_pct is not None else "—"
+
+                            st.markdown(
+                                f"""<div class="dryrun-panel">
+                                <span class="{css_class}" style="font-size:1.2rem;">{icon}</span>
+                                <span style="font-weight:600;color:#334155;">{dr.statement_id}</span>
+                                <span style="float:right;font-size:0.8rem;color:#94A3B8;">{status}</span>
+                                <br>
+                                <span style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;">
+                                计算值 = {computed} 　 论文值 = {reported} 　 偏差 = {dev}
+                                </span>
+                                </div>""",
+                                unsafe_allow_html=True,
+                            )
                     else:
                         st.info("未提取到可计算的数值声明")
 
