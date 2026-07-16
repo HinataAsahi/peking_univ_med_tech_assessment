@@ -280,12 +280,12 @@ with st.sidebar:
     # Language toggle
     if "lang" not in st.session_state:
         st.session_state.lang = "zh"
-    lang = st.radio(
+    st.radio(
         t("lang_switch"), ["zh", "en"],
         index=0 if st.session_state.lang == "zh" else 1,
         horizontal=True, label_visibility="collapsed",
+        key="lang",
     )
-    st.session_state.lang = lang
 
     st.markdown(f"### {t('sidebar_config')}")
     api_key = st.text_input(
