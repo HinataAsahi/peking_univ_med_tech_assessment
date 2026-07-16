@@ -285,30 +285,35 @@ def check_open_access(doi: str) -> dict:
         return {"is_oa": False, "pdf_url": "", "oa_status": "error"}
 
 
-def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
-    """直接下载 PDF（URL 来自 Europe PMC 元数据的 fullTextUrlList）。
+_DOWNLOAD_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/pdf,text/html,application/xhtml+xml,*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
-    不转换 URL——直接用元数据提供的链接下载。
-    失败返回空字符串。
-    """
+_REFERER_HEADERS = {
+    **_DOWNLOAD_HEADERS,
+    "Referer": "https://doi.org/",
+}
+
+
+def download_pdf(pdf_url: str, output_dir: str, filename: str) -> str:
+    """直接下载 PDF（URL 来自 Europe PMC 元数据的 fullTextUrlList）。"""
     if not pdf_url:
         return ""
 
     out_path = Path(output_dir) / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Europe PMC / PMC URL → 加 doi.org Referer
+    hdrs = _REFERER_HEADERS if "europepmc.org" in pdf_url or "ncbi.nlm.nih.gov" in pdf_url else _DOWNLOAD_HEADERS
+
     try:
-        req = urllib.request.Request(
-            pdf_url,
-            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
-        )
+        req = urllib.request.Request(pdf_url, headers=hdrs)
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
-
-        # 验证是 PDF 而非 HTML
         if data[:4] != b"%PDF":
             return ""
-
         with open(out_path, "wb") as f:
             f.write(data)
         return str(out_path)
@@ -329,33 +334,24 @@ def download_pdf_from_doi(doi: str, output_dir: str, filename: str) -> str:
 
     out_path = Path(output_dir) / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+    import re
 
-    # 策略 A：尝试常见出版商 PDF URL 模式
+    # 策略 A：尝试常见出版商 PDF URL 模式（带 Referer）
     pdf_patterns = [
-        f"https://doi.org/{doi}",
         f"https://doi.org/{doi}?pdf=render",
-        # Science Partner Journal / AAAS
         f"https://spj.science.org/doi/pdf/{doi}",
-        # Nature / Springer
         f"https://www.nature.com/articles/{doi.split('/')[-1]}.pdf",
-        # Frontiers
         f"https://www.frontiersin.org/articles/{doi}/pdf",
-        # MDPI
-        f"https://www.mdpi.com/*/*/{doi.split('/')[-1]}/pdf",
-        # eLife
         f"https://elifesciences.org/articles/{doi.split('/')[-1]}.pdf",
-        # PLOS
         f"https://journals.plos.org/plosone/article/file?id={doi}&type=printable",
-        # BioMed Central / SpringerOpen
         f"https://link.springer.com/content/pdf/{doi}.pdf",
     ]
 
     for url in pdf_patterns:
         if "*" in url:
-            continue  # 跳过含通配符的模式
+            continue
         try:
-            req = urllib.request.Request(url, headers=headers)
+            req = urllib.request.Request(url, headers=_REFERER_HEADERS)
             resp = urllib.request.urlopen(req, timeout=15)
             data = resp.read()
             if data[:4] == b"%PDF":
@@ -365,18 +361,25 @@ def download_pdf_from_doi(doi: str, output_dir: str, filename: str) -> str:
         except Exception:
             continue
 
-    # 策略 B：解析 DOI 重定向页面，提取 PDF 链接
+    # 策略 B：先访问 DOI 重定向到出版商页面，以其为 Referer 再找 PDF
+    publisher_url = ""
+    publisher_html = ""
     try:
         doi_url = f"https://doi.org/{doi}"
-        req = urllib.request.Request(doi_url, headers=headers)
+        req = urllib.request.Request(doi_url, headers=_DOWNLOAD_HEADERS)
         resp = urllib.request.urlopen(req, timeout=15)
-        page_html = resp.read().decode("utf-8", errors="ignore")
+        publisher_url = resp.url
+        publisher_html = resp.read().decode("utf-8", errors="ignore")
+    except Exception:
+        pass
+
+    if publisher_html:
+        page_ref_headers = {**_DOWNLOAD_HEADERS, "Referer": publisher_url}
 
         # 在 HTML 中搜索 PDF 链接
-        import re
         pdf_matches = re.findall(
             r'https?://[^\s"\'<>]+\.pdf[^\s"\'<>]*',
-            page_html,
+            publisher_html,
             re.IGNORECASE,
         )
         seen = set()
@@ -385,7 +388,7 @@ def download_pdf_from_doi(doi: str, output_dir: str, filename: str) -> str:
                 continue
             seen.add(pdf_url)
             try:
-                req2 = urllib.request.Request(pdf_url, headers=headers)
+                req2 = urllib.request.Request(pdf_url, headers=page_ref_headers)
                 resp2 = urllib.request.urlopen(req2, timeout=30)
                 data2 = resp2.read()
                 if data2[:4] == b"%PDF" and len(data2) > 10000:
@@ -398,12 +401,12 @@ def download_pdf_from_doi(doi: str, output_dir: str, filename: str) -> str:
         # 在 HTML 中搜索 meta citation_pdf_url
         meta_match = re.search(
             r'<meta[^>]+name="citation_pdf_url"[^>]+content="([^"]+)"',
-            page_html,
+            publisher_html,
         )
         if meta_match:
             pdf_url = meta_match.group(1)
             try:
-                req3 = urllib.request.Request(pdf_url, headers=headers)
+                req3 = urllib.request.Request(pdf_url, headers=page_ref_headers)
                 resp3 = urllib.request.urlopen(req3, timeout=30)
                 data3 = resp3.read()
                 if data3[:4] == b"%PDF":
@@ -412,9 +415,6 @@ def download_pdf_from_doi(doi: str, output_dir: str, filename: str) -> str:
                     return str(out_path)
             except Exception:
                 pass
-
-    except Exception:
-        pass
 
     return ""
 
