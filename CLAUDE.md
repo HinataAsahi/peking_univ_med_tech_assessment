@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Execution Rules
+
+**The user's explicit requirements and decisions take precedence over your own judgment.** Do not silently replace the user's requirements with what you think is more reasonable.
+
+1. Before starting a new feature, when requirements are ambiguous, or when changes involve architecture, data structures, API, dependencies, or core flow — invoke `brainstorming` first.
+2. Brainstorming only clarifies requirements and lists options. It does NOT make final decisions on the user's behalf.
+3. Before modifying code, briefly explain:
+   - Your understanding of the requirement
+   - Which files you plan to change
+   - Core implementation approach
+   - Any deviation from the user's original request
+4. If your opinion conflicts with the user's requirement, surface the disagreement and wait for confirmation. Do not apply your own approach.
+5. Small, unambiguous fixes and straightforward bug repairs may be executed directly without brainstorming.
+6. Do not expand scope, refactor unrelated code, or alter existing architecture without the user's explicit authorization.
+
 ## Project
 
 ECS Paper-to-ARM Agent — converts brain extracellular space (ECS) research papers into structured, verifiable, traceable Agent-Ready Manuscripts. Built for the NEURONCLAW 7-day hackathon (Track A). Deadline: 2026-07-18 17:00.
