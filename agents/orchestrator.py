@@ -14,9 +14,11 @@ from tools.validate_arm import validate_arm
 
 from schemas.arm import (
     ARM, PaperMetadata, Provenance, ProcessingStep,
-    Runbook, RunbookStep, EvalPlan, ExtractionMethod, DryRunStatus,
+    Runbook, RunbookStep, EvalPlan, ExtractionMethod, ClaimStatus,
 )
-from schemas.pipeline import ParsedPaper, ExtractionResult, DryRunResult, NumericalStatement
+from schemas.pipeline import (
+    ParsedPaper, ExtractionResult, DryRunResult, DryRunStatus, NumericalStatement,
+)
 from schemas.validation import ValidationReport
 
 
@@ -166,9 +168,9 @@ def _build_arm(
             ns = next((n for n in extraction.numerical_statements if n.id == dr.statement_id), None)
             if ns and ns.claim_id == claim.id:
                 if dr.status == DryRunStatus.PASSED:
-                    claim.status = "supported"
+                    claim.status = ClaimStatus.SUPPORTED
                 elif dr.status == DryRunStatus.MISMATCH:
-                    claim.status = "contradicted"
+                    claim.status = ClaimStatus.CONTRADICTED
                 elif dr.status in (DryRunStatus.INSUFFICIENT_DATA, DryRunStatus.CALCULATION_ERROR):
                     claim.extraction_method = ExtractionMethod.REVIEW_REQUIRED
 
@@ -216,10 +218,11 @@ def _build_arm(
 
 
 def _translate_formula(ns: NumericalStatement) -> str:
-    """将自然语言公式转为 Python 表达式（简化版映射）"""
+    """将自然语言公式转为 Python 表达式（简化版映射 + 参数计算）"""
     formula = ns.formula_nl.strip()
+    params = ns.parameters or {}
 
-    # 常见公式映射
+    # 常见公式精确映射
     mappings = {
         "λ = √(D/D*)": "sqrt(D / D_star)",
         "λ² = D/D*": "D / D_star",
@@ -227,16 +230,26 @@ def _translate_formula(ns: NumericalStatement) -> str:
         "D = kT/(6πηr)": "k * T / (6 * pi * eta * r)",
         "Pe = v·L/D*": "v * L / D_star",
     }
-
-    # 精确匹配
     for nl, py in mappings.items():
         if nl.lower().replace(" ", "") == formula.lower().replace(" ", ""):
             return py
 
-    # 如果 formula_nl 本身已经是 Python 表达式
+    # 如果 formula_nl 本身已经是 Python 表达式（含运算符）
     if any(op in formula for op in ["sqrt", "**", "*", "/", "+", "-"]):
-        # 替换常见符号
         formula = formula.replace("×", "*").replace("·", "*").replace("÷", "/")
         return formula
+
+    # 如果 formula_nl 看起来像描述性文本而非公式，尝试从参数构建
+    import re
+    param_names = list(params.keys()) if params else []
+
+    if params and not any(op in formula for op in ["*", "/", "+", "-", "sqrt"]):
+        # 尝试构建百分比变化公式（e.g., "increase in α = 28%"）
+        pct_match = re.search(r'(\d+(?:\.\d+)?)\s*%', formula)
+        if pct_match and len(param_names) >= 2:
+            ko_key = next((k for k in param_names if 'ko' in k.lower() or 'mutant' in k.lower()), "")
+            wt_key = next((k for k in param_names if 'wt' in k.lower() or 'wild' in k.lower() or 'control' in k.lower()), "")
+            if ko_key and wt_key and ko_key != wt_key:
+                return f"({ko_key} - {wt_key}) / {wt_key} * 100"
 
     return formula

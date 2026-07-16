@@ -38,6 +38,14 @@ def main():
         "--email", type=str, default="student@example.com",
         help="PubMed API 要求的联系邮箱"
     )
+    parser.add_argument(
+        "--years", type=str, default="2023:2026",
+        help="论文检索年份范围，格式如 '2000:2010'（默认: 2023:2026）"
+    )
+    parser.add_argument(
+        "--no-download", action="store_true",
+        help="仅搜索，不下载 PDF"
+    )
     args = parser.parse_args()
 
     if args.search:
@@ -66,10 +74,13 @@ def _do_search(args):
     print(f"  5 个类别 × 3 篇/类 = 最多 15 篇")
     print(f"{'='*60}\n")
 
+    print(f"  年份范围: {args.years}")
+
     results = search_and_download_ecs_papers(
         output_dir=args.output or "papers",
         email=args.email,
-        auto_download=True,
+        auto_download=not args.no_download,
+        years=args.years,
     )
 
     print(f"找到 {len(results.papers)} 篇论文，下载 {len(results.downloaded)} 篇\n")

@@ -123,7 +123,7 @@ def search_europepmc(
     """
     import json
 
-    full_query = f"({query}) AND (FIRST_PDATE:[{years[:4]}-01-01 TO {years[5:]}-12-31]) AND (OPEN_ACCESS:Y)"
+    full_query = f"({query}) AND (FIRST_PDATE:[{years[:4]}-01-01 TO {years[5:]}-12-31]) AND (HAS_PDF:Y)"
     results = SearchResults(query=full_query)
 
     try:
@@ -155,26 +155,30 @@ def search_europepmc(
         if isinstance(full_text_wrapper, dict):
             full_text_list = full_text_wrapper.get("fullTextUrl", [])
         else:
-            full_text_list = full_text_list if isinstance(full_text_list, list) else []
+            full_text_list = []
 
-        # 从 fullTextUrlList 中找 PDF：site=Europe_PMC, style=pdf, avail=Open access
+        # 收集所有可访问的 PDF URL，优先选择出版商直链（非 PMC ?pdf=render）
+        publisher_pdfs = []  # 出版商直链 PDF（nature.com, frontiersin.org, mdpi.com 等）
+        pmc_pdfs = []        # Europe PMC / NCBI PDF
+
         for ft in full_text_list:
             if not isinstance(ft, dict):
                 continue
-            avail = ft.get("availability", "")
-            if "open" not in avail.lower():
+            avail = ft.get("availability", "").lower()
+            if "subscription" in avail:
                 continue
-            if ft.get("documentStyle") == "pdf":
-                pdf_url = ft.get("url", "")
-                if pdf_url:
-                    break
-            # Fallback: HTML URL for PMC papers
-            if ft.get("documentStyle") == "html" and "europepmc.org" in ft.get("url", ""):
-                # 将 HTML URL 转为 PDF URL
-                pdf_url = ft.get("url", "").replace("?page=1", "?pdf=render")
-                if "pdf=render" not in pdf_url:
-                    pdf_url = pdf_url.rstrip("/") + "?pdf=render"
-                break
+            if ft.get("documentStyle") != "pdf":
+                continue
+            url = ft.get("url", "")
+            if not url:
+                continue
+            if "europepmc.org" in url or "ncbi.nlm.nih.gov" in url:
+                pmc_pdfs.append(url)
+            else:
+                publisher_pdfs.append(url)
+
+        # 优先出版商直链，因为 PMC ?pdf=render 经常 404
+        pdf_url = publisher_pdfs[0] if publisher_pdfs else (pmc_pdfs[0] if pmc_pdfs else "")
 
         abstract = item.get("abstractText", "")
         # 去掉 HTML 标签
@@ -451,6 +455,7 @@ def search_and_download_ecs_papers(
     email: str = "student@example.com",
     auto_download: bool = True,
     backend: str = "europepmc",
+    years: str = "2023:2026",
 ) -> SearchResults:
     """搜索并下载 ECS 领域 5 类论文。
 
@@ -472,10 +477,10 @@ def search_and_download_ecs_papers(
     for category, query in ECS_QUERIES.items():
         if backend == "europepmc":
             # Europe PMC：一步获取元数据 + OA PDF 链接
-            results = search_europepmc(query, max_results=max_per_query)
+            results = search_europepmc(query, max_results=max_per_query, years=years)
         else:
             # PubMed + Unpaywall：两步
-            results = search_pubmed(query, max_results=max_per_query, email=email)
+            results = search_pubmed(query, max_results=max_per_query, email=email, years=years)
             time.sleep(0.5)
 
         for paper in results.papers:
