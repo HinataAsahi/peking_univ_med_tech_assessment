@@ -22,6 +22,7 @@ class PaperSearchResult(BaseModel):
     has_pdf: bool = False
     pdf_url: str = ""
     is_open_access: bool = False
+    download_source: str = ""  # "europepmc" | "doi" | "" (未下载)
 
 
 class SearchResults(BaseModel):
@@ -498,6 +499,7 @@ def search_and_download_ecs_papers(
             if auto_download and paper.pdf_url:
                 path = download_pdf(paper.pdf_url, output_dir, fname)
                 if path:
+                    paper.download_source = "europepmc"
                     downloaded.append(path)
                     time.sleep(0.3)
                     continue
@@ -507,6 +509,7 @@ def search_and_download_ecs_papers(
                 time.sleep(0.3)
                 path = download_pdf_from_doi(paper.doi, output_dir, fname)
                 if path:
+                    paper.download_source = "doi"
                     downloaded.append(path)
 
         if backend == "pubmed":

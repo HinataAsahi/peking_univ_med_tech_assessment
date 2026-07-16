@@ -66,7 +66,10 @@ if mode == "🔍 搜索并下载论文":
             st.subheader("📋 搜索结果")
             for p in results.papers:
                 oa = "🔓" if p.is_open_access else "🔒"
-                dl = "✅" if p.has_pdf else "❌"
+                if p.download_source:
+                    dl = f"📥{p.download_source.upper()}"
+                else:
+                    dl = "✅" if p.has_pdf else "❌"
                 st.markdown(
                     f"{oa} {dl} **[{p.year}]** {p.title}\n\n"
                     f"*{', '.join(p.authors[:3])}* | "

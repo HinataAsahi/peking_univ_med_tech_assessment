@@ -76,7 +76,10 @@ def _do_search(args):
 
     for i, p in enumerate(results.papers, 1):
         oa_icon = "🔓" if p.is_open_access else "🔒"
-        dl_icon = "✅" if p.has_pdf else "❌"
+        if p.download_source:
+            dl_icon = {"europepmc": "📥PMC", "doi": "📥DOI"}.get(p.download_source, "✅")
+        else:
+            dl_icon = "✅" if p.has_pdf else "❌"
         print(f"{i}. {oa_icon} {dl_icon} [{p.year}] {p.title[:100]}")
         print(f"   {', '.join(p.authors[:3])}{', ...' if len(p.authors) > 3 else ''}")
         print(f"   DOI: {p.doi} | PMID: {p.pmid}")
