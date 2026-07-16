@@ -105,7 +105,7 @@ def search_pubmed(
 def search_europepmc(
     query: str,
     max_results: int = 10,
-    years: str = "2023:2025",
+    years: str = "2023:2026",
 ) -> SearchResults:
     """通过 Europe PMC REST API 搜索论文。
 
