@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ECS Paper-to-ARM Agent — NEURONCLAW Track A</title>
+<style>
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { page-break-after: always; margin: 0; }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    color: #1e293b;
+    line-height: 1.6;
+    background: #f8fafc;
+  }
+
+  .page {
+    width: 210mm; min-height: 297mm;
+    margin: 0 auto 12mm;
+    background: white;
+    padding: 20mm 18mm;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  /* Typography */
+  h1 { font-size: 2.4em; font-weight: 800; color: #1a365d; letter-spacing: -0.02em; }
+  h2 { font-size: 1.6em; font-weight: 700; color: #1a365d; margin-bottom: 12px; border-bottom: 3px solid #0891b2; padding-bottom: 6px; }
+  h3 { font-size: 1.15em; font-weight: 600; color: #0e7490; margin: 14px 0 6px; }
+  p { margin: 6px 0; font-size: 10pt; }
+  small { color: #64748b; font-size: 8.5pt; }
+
+  /* Cover page */
+  .cover { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .cover .tag { background: #0891b2; color: white; padding: 4px 16px; border-radius: 20px; font-size: 10pt; font-weight: 600; margin-bottom: 20px; }
+  .cover h1 { margin: 12px 0; }
+  .cover .subtitle { font-size: 1.1em; color: #475569; margin: 8px 0 24px; }
+  .cover .meta { font-size: 9pt; color: #94a3b8; margin-top: 40px; }
+  .cover .accent-bar { width: 80px; height: 4px; background: linear-gradient(90deg, #0891b2, #06b6d4); border-radius: 2px; margin: 16px 0; }
+
+  /* Metric cards */
+  .metrics { display: flex; gap: 12px; margin: 16px 0; }
+  .metric-card {
+    flex: 1; padding: 14px 12px; border-radius: 10px;
+    text-align: center; background: #f0f9ff; border: 1px solid #e0f2fe;
+  }
+  .metric-card .value { font-size: 2em; font-weight: 800; color: #0e7490; }
+  .metric-card .label { font-size: 8pt; color: #64748b; margin-top: 4px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9pt; }
+  thead th { background: #1a365d; color: white; padding: 8px 10px; text-align: left; font-weight: 600; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  .pass { color: #0891b2; font-weight: 700; }
+  .fail { color: #ef4444; }
+  .na { color: #94a3b8; }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 28px; margin: 12px 0; }
+  .timeline::before { content: ""; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #cbd5e1; }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-item::before { content: ""; position: absolute; left: -24px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #0891b2; border: 2px solid white; box-shadow: 0 0 0 2px #0891b2; }
+  .tl-item .tl-date { font-size: 8pt; color: #94a3b8; }
+  .tl-item .tl-text { font-size: 9.5pt; margin-top: 2px; }
+
+  /* Decision table */
+  .decision-grid { display: grid; grid-template-columns: 1fr 2fr 2fr; gap: 0; margin: 12px 0; font-size: 9pt; }
+  .decision-grid > div { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+  .decision-grid .dg-header { background: #1a365d; color: white; font-weight: 600; border-bottom: none; }
+  .decision-grid .dg-label { font-weight: 600; color: #0e7490; background: #f0f9ff; }
+
+  /* Code */
+  code { font-family: "JetBrains Mono", "Cascadia Code", monospace; font-size: 8.5pt; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+  .code-block { background: #1e293b; color: #e2e8f0; padding: 12px 16px; border-radius: 8px; font-family: "JetBrains Mono", monospace; font-size: 8.5pt; line-height: 1.5; margin: 10px 0; overflow-x: auto; }
+
+  /* Formula display */
+  .formula-display { background: linear-gradient(135deg, #f0f9ff, #ecfeff); border-left: 4px solid #0891b2; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 10px 0; font-family: "JetBrains Mono", monospace; font-size: 10pt; }
+
+  /* Figure */
+  figure { margin: 12px 0; text-align: center; }
+  figure img { max-width: 100%; border-radius: 8px; }
+  figcaption { font-size: 8pt; color: #94a3b8; margin-top: 6px; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 8pt; font-weight: 600; }
+  .badge-pass { background: #ccfbf1; color: #0f766e; }
+  .badge-fail { background: #fee2e2; color: #dc2626; }
+  .badge-info { background: #e0f2fe; color: #0e7490; }
+
+  /* UI mockup */
+  .ui-mockup { border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+  .ui-mockup .ui-header { background: #1a365d; color: white; padding: 8px 14px; font-size: 9pt; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .ui-mockup .ui-header .dot { width: 8px; height: 8px; border-radius: 50%; background: #0891b2; }
+  .ui-mockup .ui-body { padding: 14px; font-size: 9pt; }
+  .ui-mockup .ui-sidebar { width: 30%; float: left; border-right: 1px solid #e2e8f0; padding: 10px; min-height: 200px; }
+  .ui-mockup .ui-main { width: 67%; float: right; padding: 10px; }
+  .ui-mockup::after { content: ""; display: table; clear: both; }
+  .mock-btn { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 8pt; font-weight: 600; }
+  .mock-btn-primary { background: #0891b2; color: white; }
+  .mock-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 8pt; margin: 2px; }
+  .mock-tag-green { background: #ccfbf1; color: #0f766e; }
+  .mock-tag-amber { background: #fef3c7; color: #92400e; }
+
+  /* Two column */
+  .two-col { display: flex; gap: 16px; }
+  .two-col > div { flex: 1; }
+
+  /* Footer */
+  .page-footer { position: absolute; bottom: 10mm; right: 18mm; font-size: 8pt; color: #cbd5e1; }
+
+  /* Chart container */
+  .chart-container { text-align: center; margin: 10px 0; }
+  .chart-container img { max-width: 100%; max-height: 200px; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- PAGE 1: COVER -->
+<!-- ============================================================ -->
+<div class="page cover">
+  <div class="tag">NEURONCLAW 2026 · Track A</div>
+  <h1>ECS Paper-to-ARM Agent</h1>
+  <div class="accent-bar"></div>
+  <div class="subtitle">
+    将脑细胞外间隙（ECS）研究论文<br>
+    转化为结构化、可验证、可追溯的 Agent-Ready Manuscript
+  </div>
+
+  <div class="metrics" style="margin-top: 30px;">
+    <div class="metric-card">
+      <div class="value">14</div>
+      <div class="label">论文处理</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">87</div>
+      <div class="label">Claims 提取</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">68</div>
+      <div class="label">Dry-Run 验证</div>
+    </div>
+    <div class="metric-card" style="background:#f0fdf4; border-color:#dcfce7;">
+      <div class="value" style="color:#0f766e;">23</div>
+      <div class="label">验证通过</div>
+    </div>
+  </div>
+
+  <p style="margin-top: 24px; color: #64748b; font-size: 9pt;">
+    5-Stage Pipeline: Ingest → Extract → Compute → Validate → Export
+  </p>
+
+  <div class="meta">
+    July 2026 · 25 commits · 2,674 lines Python · 15 tests<br>
+    提交人：赵晨旭
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 2: 问题与方案 -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>1. 问题与方案</h2>
+
+  <h3>痛点</h3>
+  <p>脑细胞外间隙（ECS）是神经科学核心研究领域，每年数百篇论文发表。但当前研究面临三大挑战：</p>
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="label" style="font-size:9pt; color:#1e293b;"><strong>结论追溯困难</strong><br><small>论文结论缺乏到原文的精确引用链（页码+原文引用）</small></div>
+    </div>
+    <div class="metric-card">
+      <div class="label" style="font-size:9pt; color:#1e293b;"><strong>数值验证缺失</strong><br><small>论文报告的定量结果（α, λ, D*）缺乏独立的计算验证</small></div>
+    </div>
+    <div class="metric-card">
+      <div class="label" style="font-size:9pt; color:#1e293b;"><strong>证据可信度未知</strong><br><small>无法区分论文直接陈述 vs 模型推断 vs 需要人工复核的结论</small></div>
+    </div>
+  </div>
+
+  <h3>方案：5-Stage Pipeline</h3>
+  <figure>
+    <img src="pipeline_flow.svg" alt="Pipeline Architecture" style="width:100%;">
+    <figcaption>图1：ECS Paper-to-ARM 的 5 阶段流水线架构</figcaption>
+  </figure>
+
+  <h3>核心创新</h3>
+  <table>
+    <thead><tr><th>特性</th><th>实现</th><th>意义</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Provenance 追溯</strong></td><td>每条 Claim 记录 SourceLocation（页码、章节、原文引用）</td><td>可精确定位到 PDF 原文</td></tr>
+      <tr><td><strong>ExtractionMethod 分类</strong></td><td>exact_quote / llm_inferred / review_required</td><td>区分复制 vs 推断 vs 需复核</td></tr>
+      <tr><td><strong>Dry-Run 计算验证</strong></td><td>安全沙箱 exec() 执行论文公式，5% 容差</td><td>独立验证论文定量数据</td></tr>
+      <tr><td><strong>Hallucination 检测</strong></td><td>子串匹配 + 模糊 Token 重叠（阈值 0.6）</td><td>自动检测 LLM 幻觉</td></tr>
+      <tr><td><strong>Web UI</strong></td><td>Streamlit 中/英双语界面 + 论文搜索下载</td><td>低门槛交互</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">2 / 8</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 3: 协作与决策过程 ★ -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>2. 协作与决策过程</h2>
+  <p style="font-size:9pt; color:#64748b; margin-bottom: 12px;">本项目的代码实现在 AI 辅助下完成，但<strong>所有关键设计决策均由人工主导</strong>——需求定义、架构选择、执行规则的制定均来自讨论与把关。以下是核心决策节点。</p>
+
+  <h3>关键决策时间线</h3>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Day 1 · 架构设计</div>
+      <div class="tl-text"><strong>选择线性 Pipeline 而非循环迭代架构</strong> —— 先跑通端到端逻辑，后续可扩展循环优化。避免了过早复杂化。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Day 1 · 执行规则确立</div>
+      <div class="tl-text"><strong>明确「用户需求 > AI 判断」优先级</strong> —— 当 AI 擅自修改年份范围、缩减功能范围时，坚决纠正。将执行规则写入 CLAUDE.md。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Day 2 · 时间管理决策</div>
+      <div class="tl-text"><strong>时间压缩但任务量不变</strong> —— 虽然只剩 3.5 天，但拒绝缩减 Streamlit、Dry-Run 等核心功能，选择提高执行效率。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Day 2 · 论文检索策略</div>
+      <div class="tl-text"><strong>添加自动化论文搜索下载模块</strong> —— 从手动找论文升级为 Europe PMC API 自动搜索 + PDF 下载，提升效率。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Day 3 · Streamlit UI 迭代</div>
+      <div class="tl-text"><strong>统一 Light 主题、移除所有 emoji、添加中/英切换</strong> —— 多次迭代 UI：修复主题不一致、语言切换 race condition。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Day 3 · Dry-Run Prompt 优化</div>
+      <div class="tl-text"><strong>LLM Prompt 从描述性文本改为可计算公式</strong> —— 参数名 ASCII 化、formula 必须是数学表达式，使 dry-run 从 0 跃升至 23 通过。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Day 3 · 检索年份扩展</div>
+      <div class="tl-text"><strong>创建分支拓宽检索到 1990-2017</strong> —— 找到 AQP4-KO、Synucleinopathy 等经典 ECS 定量论文，是 dry-run 成功的关键。</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 16px;">
+    <h3>决策影响一览</h3>
+    <table>
+      <thead><tr><th>决策节点</th><th>没有这个决策会怎样</th><th>实际影响</th></tr></thead>
+      <tbody>
+        <tr><td>执行规则写入 CLAUDE.md</td><td>AI 反复擅自修改需求</td><td>后续所有改动严格对齐用户要求</td></tr>
+        <tr><td>拒绝缩减功能范围</td><td>缺少 Streamlit UI 或 Dry-Run</td><td>完整的 CLI + Web + 验证体系</td></tr>
+        <tr><td>Prompt ASCII 化 + 公式约束</td><td>Dry-run 全部 insufficient_data</td><td><strong>0 → 23 通过，核心演示成立</strong></td></tr>
+        <tr><td>年份拓宽 + HAS_PDF 过滤</td><td>只能找到近 3 年定性论文</td><td>找到经典定量论文（AQP4-KO 等）</td></tr>
+        <tr><td>语言切换 bug 修复</td><td>UI 体验差</td><td>中/英双语稳定切换</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="page-footer">3 / 8</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 4: Pipeline 技术详解 -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>3. Pipeline 技术详解</h2>
+
+  <table>
+    <thead><tr><th style="width:10%">阶段</th><th style="width:15%">工具</th><th>输入</th><th>输出</th><th>关键技术点</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>1. Ingest</strong></td>
+        <td>PyMuPDF</td>
+        <td>PDF 文件</td>
+        <td><code>ParsedPaper</code><br>(页文本 + 元数据)</td>
+        <td>逐页提取文本块、自动识别文本/图片/表格类型、限 50 页</td>
+      </tr>
+      <tr>
+        <td><strong>2. Extract</strong></td>
+        <td>DeepSeek V4<br>(deepseek-chat)</td>
+        <td><code>ParsedPaper</code></td>
+        <td><code>ExtractionResult</code><br>(Claims, Evidence,<br>NumericalStatements,<br>Protocol, Limitations)</td>
+        <td>两轮提取策略（摘要→追加章节）、temperature=0、逐条 try/except 容错、Markdown fence 剥离</td>
+      </tr>
+      <tr>
+        <td><strong>3. Compute</strong></td>
+        <td>Sandbox exec()</td>
+        <td><code>NumericalStatement</code></td>
+        <td><code>DryRunResult</code><br>(status, computed,<br>deviation)</td>
+        <td>白名单沙箱（math only）、5s 超时、5% 容差、ASCII 参数名、公式转译</td>
+      </tr>
+      <tr>
+        <td><strong>4. Validate</strong></td>
+        <td>6-Rule Engine</td>
+        <td><code>ARM</code></td>
+        <td><code>ValidationReport</code></td>
+        <td>R1 Schema、R2 数量(≥5)、R3 Claim-Evidence 关联、R4 Hallucination 检测（子串+模糊）、R5 Provenance 评分、R6 Inference 标记</td>
+      </tr>
+      <tr>
+        <td><strong>5. Export</strong></td>
+        <td>PyYAML / JSON</td>
+        <td>完整 ARM +<br>Validation +<br>Dry-Run 结果</td>
+        <td>arm.yaml + arm.json<br>+ validation.json<br>+ run.log</td>
+        <td>Pydantic 序列化、YAML 可读性、Run Log 文本摘要</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>数据模型（Pydantic）</h3>
+  <p>所有阶段通过类型化对象通信，确保类型安全：</p>
+  <div class="code-block">
+<span style="color:#67e8f9;">class</span> <span style="color:#f0e68c;">Claim</span>(BaseModel):
+    id: str                           <span style="color:#64748b;"># C-001</span>
+    text: str                         <span style="color:#64748b;"># 科学结论原文</span>
+    extraction_method: ExtractionMethod <span style="color:#64748b;"># exact_quote | llm_inferred | review_required</span>
+    source: SourceLocation            <span style="color:#64748b;"># 页码 + 章节 + 原文引用</span>
+    evidence_refs: list[str]          <span style="color:#64748b;"># 关联 Evidence ID</span>
+    status: ClaimStatus               <span style="color:#64748b;"># unverified | supported | contradicted</span>
+
+<span style="color:#67e8f9;">class</span> <span style="color:#f0e68c;">DryRunResult</span>(BaseModel):
+    statement_id: str                 <span style="color:#64748b;"># N-001</span>
+    status: DryRunStatus              <span style="color:#64748b;"># passed | mismatch | insufficient_data | calculation_error</span>
+    computed_value: float | None
+    reported_value: float | None
+    deviation_pct: float | None
+  </div>
+
+  <div class="page-footer">4 / 8</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 5: Dry-Run 验证案例 -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>4. Dry-Run 验证案例</h2>
+  <p style="font-size:9pt; color:#64748b; margin-bottom: 10px;">
+  论文：<em>Aquaporin-4-deficient mice have increased extracellular space without tortuosity change</em> (J Neurosci, 2008)
+  </p>
+
+  <h3>提取的定量数据</h3>
+  <div class="code-block">
+<span style="color:#94a3b8;"># 论文原文：</span>
+<span style="color:#e2e8f0;">"Mice lacking AQP4 showed a 28% increase in α</span>
+<span style="color:#e2e8f0;"> (0.23 ± 0.007 vs 0.18 ± 0.003) with no differences</span>
+<span style="color:#e2e8f0;"> in λ (1.62 ± 0.04 vs 1.61 ± 0.02)"</span>
+  </div>
+
+  <h3>Dry-Run 验证结果</h3>
+  <table>
+    <thead><tr><th>验证项</th><th>公式</th><th>参数</th><th>计算值</th><th>报告值</th><th>偏差</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>α %变化</td>
+        <td><code>(alpha_KO - alpha_WT) / alpha_WT * 100</code></td>
+        <td style="font-size:8pt;">α<sub>KO</sub>=0.23<br>α<sub>WT</sub>=0.18</td>
+        <td>27.78%</td>
+        <td>28.0%</td>
+        <td>0.79%</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>α 差值</td>
+        <td><code>alpha_KO - alpha_WT</code></td>
+        <td style="font-size:8pt;">同上</td>
+        <td>0.050</td>
+        <td>0.050</td>
+        <td>0.00%</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>λ 差值</td>
+        <td><code>lambda_KO - lambda_WT</code></td>
+        <td style="font-size:8pt;">λ<sub>KO</sub>=1.62<br>λ<sub>WT</sub>=1.61</td>
+        <td>0.010</td>
+        <td>0.010</td>
+        <td>0.00%</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>k' 差值</td>
+        <td><code>k_prime_KO - k_prime_WT</code></td>
+        <td style="font-size:8pt;">k'<sub>KO</sub>=0.0045<br>k'<sub>WT</sub>=0.0031</td>
+        <td>0.0014</td>
+        <td>0.0014</td>
+        <td>0.00%</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>α 比值</td>
+        <td><code>alpha_KO / alpha_WT</code></td>
+        <td style="font-size:8pt;">同上</td>
+        <td>1.278</td>
+        <td>1.280</td>
+        <td>0.17%</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>脑片 α%</td>
+        <td><code>(alpha_slice_KO - alpha_slice_WT) / alpha_slice_WT * 100</code></td>
+        <td style="font-size:8pt;">参数不足</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="badge badge-fail">INSUFFICIENT</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="two-col">
+    <div>
+      <h3>Prompt 改进前后对比</h3>
+      <table>
+        <thead><tr><th></th><th>改进前</th><th>改进后</th></tr></thead>
+        <tbody>
+          <tr><td>Dry-Run 总数</td><td class="fail">4</td><td class="pass">6</td></tr>
+          <tr><td>通过数</td><td class="fail">0</td><td class="pass">5</td></tr>
+          <tr><td>通过率</td><td class="fail">0%</td><td class="pass">83%</td></tr>
+          <tr><td>参数名</td><td style="font-size:8pt;">α_AQP4_KO</td><td style="font-size:8pt;">alpha_KO</td></tr>
+          <tr><td>公式</td><td style="font-size:8pt;">"α = ECS volume fraction"<br>(描述性文本)</td><td style="font-size:8pt;">"(alpha_KO - alpha_WT) / alpha_WT * 100"<br>(数学表达式)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding-top: 20px;">
+      <div class="formula-display">
+        <strong>改进要点：</strong><br>
+        1. 参数名 ASCII 化<br>
+        2. 公式从描述 → 可执行数学表达式<br>
+        3. reported_value 必须提取（不为 null）<br>
+        4. 每个定量比较单独一个 statement
+      </div>
+    </div>
+  </div>
+  <div class="page-footer">5 / 8</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 6: 全量结果 -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>5. 全量结果</h2>
+
+  <div class="chart-container">
+    <img src="dry_run_chart.png" alt="Dry-Run Results Chart">
+  </div>
+
+  <h3>论文处理统计</h3>
+  <table>
+    <thead><tr><th>论文</th><th>年份</th><th>Claims</th><th>Dry-Runs</th><th>通过</th><th>通过率</th></tr></thead>
+    <tbody>
+      <tr><td>Synucleinopathy Nanoscale ECS</td><td>2020</td><td>6</td><td>14</td><td class="pass">6</td><td>43%</td></tr>
+      <tr><td>AQP4-KO ECS Tortuosity <span class="badge badge-info">★</span></td><td>2008</td><td>6</td><td>6</td><td class="pass">5</td><td>83%</td></tr>
+      <tr><td>Rhabdomyolysis Review</td><td>2024</td><td>7</td><td>6</td><td class="pass">5</td><td>83%</td></tr>
+      <tr><td>ECV Fraction MR Conductivity</td><td>2023</td><td>6</td><td>5</td><td class="pass">4</td><td>80%</td></tr>
+      <tr><td>Deep Learning Porous Media</td><td>2023</td><td>8</td><td>3</td><td class="pass">3</td><td>100%</td></tr>
+      <tr><td>AQP4-KO Interstitial Fluid</td><td>2018</td><td>6</td><td>4</td><td class="fail">0</td><td>0%</td></tr>
+      <tr><td>Cryptococcal Brain Granuloma</td><td>2022</td><td>5</td><td>4</td><td class="fail">0</td><td>0%</td></tr>
+      <tr><td>TASTPM Alzheimer's Model</td><td>2024</td><td>7</td><td>2</td><td class="fail">0</td><td>0%</td></tr>
+      <tr><td>α-Synuclein Nanoscale Diffusion</td><td>2024</td><td>5</td><td>2</td><td class="fail">0</td><td>0%</td></tr>
+      <tr><td>ECM & PNNs Modulate ECS</td><td>2024</td><td>7</td><td>2</td><td class="fail">0</td><td>0%</td></tr>
+      <tr><td>Glymphatic apoE Distribution</td><td>2016</td><td>5</td><td>17</td><td class="fail">0</td><td>0%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>累积统计</h3>
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="value">14</div>
+      <div class="label">唯一论文</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">87</div>
+      <div class="label">Claims 提取</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">68</div>
+      <div class="label">Dry-Run 执行</div>
+    </div>
+    <div class="metric-card" style="background:#f0fdf4; border-color:#dcfce7;">
+      <div class="value" style="color:#0f766e;">34%</div>
+      <div class="label">通过率 (23/68)</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">5</div>
+      <div class="label">论文 ≥1 通过</div>
+    </div>
+  </div>
+  <div class="page-footer">6 / 8</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 7: Streamlit UI -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>6. Streamlit Web 界面</h2>
+
+  <div class="ui-mockup">
+    <div class="ui-header">
+      <div class="dot"></div>
+      <div>ECS Paper-to-ARM Agent</div>
+      <div style="flex:1; text-align:right; font-size:8pt; opacity:0.7;">Search 🔍</div>
+    </div>
+    <div class="ui-body">
+      <div class="ui-sidebar">
+        <strong style="font-size:9pt;">API 配置</strong><br>
+        <small>DEEPSEEK_API_KEY: sk-...a1bf</small><br><br>
+        <strong style="font-size:9pt;">语言 / Language</strong><br>
+        <small>● 中文 &nbsp; ○ English</small><br><br>
+        <strong style="font-size:9pt;">要求</strong><br>
+        <small>✅ ≥5 Claims</small><br>
+        <small>✅ ≥1 Dry-Run</small><br>
+        <small>✅ Provenance 追溯</small>
+      </div>
+      <div class="ui-main">
+        <div style="margin-bottom:6px;">
+          <span class="mock-btn mock-btn-primary">📄 Analyze Paper</span>
+          <span class="mock-btn" style="border:1px solid #cbd5e1;">🔍 Search & Download</span>
+        </div>
+        <p style="font-size:8pt; color:#64748b; margin:8px 0;">拖拽 PDF 或点击上传</p>
+        <div style="padding:10px 0;">
+          <p style="font-size:9pt;"><strong>📊 Claims (6)</strong></p>
+          <span class="mock-tag mock-tag-green">C-001 exact_quote</span>
+          <span class="mock-tag mock-tag-amber">C-003 review_required</span>
+          <span class="mock-tag mock-tag-green">C-004 exact_quote</span>
+          <p style="font-size:9pt; margin-top:10px;"><strong>🧮 Dry-Runs (6)</strong></p>
+          <small>✅ N-001: passed (α% change, dev=0.79%)</small><br>
+          <small>✅ N-002: passed (α diff, dev=0.00%)</small><br>
+          <small>✅ N-003: passed (λ diff, dev=0.00%)</small><br>
+          <small>⚠️ N-005: insufficient_data</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>功能矩阵</h3>
+  <table>
+    <thead><tr><th>功能</th><th>说明</th><th>技术实现</th></tr></thead>
+    <tbody>
+      <tr><td>📄 论文分析</td><td>上传 PDF → 自动运行 5 阶段 Pipeline</td><td>Streamlit file_uploader + Orchestrator</td></tr>
+      <tr><td>🔍 论文搜索</td><td>5 类 ECS 查询、可配置年份、自动下载</td><td>Europe PMC REST API + 出版商 PDF 直链</td></tr>
+      <tr><td>🌐 中/英切换</td><td>150+ 翻译条目、session state 管理</td><td>t() 函数 + st.radio key="lang"</td></tr>
+      <tr><td>📊 结果可视化</td><td>Pipeline 指示器、Dry-Run 面板、Claim 标签</td><td>自定义 CSS + Metric 卡片</td></tr>
+      <tr><td>📦 结果导出</td><td>ARM YAML + JSON + Validation Report + Run Log</td><td>PyYAML + Pydantic model_dump()</td></tr>
+    </tbody>
+  </table>
+
+  <h3>技术栈</h3>
+  <div class="two-col">
+    <div>
+      <table>
+        <thead><tr><th>层级</th><th>技术</th></tr></thead>
+        <tbody>
+          <tr><td>UI</td><td>Streamlit + 自定义 CSS</td></tr>
+          <tr><td>LLM</td><td>DeepSeek V4 (deepseek-chat)</td></tr>
+          <tr><td>PDF</td><td>PyMuPDF (fitz)</td></tr>
+          <tr><td>搜索</td><td>Europe PMC REST API</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <table>
+        <thead><tr><th>层级</th><th>技术</th></tr></thead>
+        <tbody>
+          <tr><td>Schema</td><td>Pydantic v2</td></tr>
+          <tr><td>验证</td><td>安全沙箱 exec()</td></tr>
+          <tr><td>测试</td><td>pytest (15 tests)</td></tr>
+          <tr><td>导出</td><td>YAML + JSON</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="page-footer">7 / 8</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 8: 收获与展望 -->
+<!-- ============================================================ -->
+<div class="page">
+  <h2>7. 收获与展望</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>技术收获</h3>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-text"><strong>LLM Prompt 工程</strong> —— 从自然语言描述到可执行数学表达式，关键是约束输出格式和参数命名规范。Prompt 的每一个细节改变都可能带来质的差异（0→23 通过）。</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>Pipeline 可测试性</strong> —— 每阶段独立输入/输出 + Pydantic 类型约束，使得每个工具可以独立测试、独立调试，而不影响其他阶段。</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>Provenance 是可信度的基石</strong> —— 页码+原文引用+提取方法的记录，把"AI 说了什么"变成了"论文说了什么 + AI 怎么理解的"。</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>安全沙箱 Dry-Run</strong> —— 白名单 exec() 虽然简单，但足够验证论文定量数据。关键是建立自然语言公式 → Python 表达式的映射。</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>论文检索策略</strong> —— OA vs Free vs Subscription 的差异很大。HAS_PDF:Y 远比 OPEN_ACCESS:Y 有效，出版商直链远优于 PMC ?pdf=render。</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>当前局限</h3>
+      <table>
+        <thead><tr><th>局限</th><th>影响</th></tr></thead>
+        <tbody>
+          <tr><td>LLM 依赖 DeepSeek API</td><td>离线不可用、token 成本</td></tr>
+          <tr><td>PDF 获取受限</td><td>PMC ?pdf=render 404、出版商 403</td></tr>
+          <tr><td>公式转译覆盖有限</td><td>仅支持约 5 种预定义模式 + 参数推导</td></tr>
+          <tr><td>无多轮迭代验证</td><td>dry-run 失败无法自动修正</td></tr>
+          <tr><td>无表格/图片数据提取</td><td>仅文本提取，漏掉图表中的数据</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:16px;">未来方向</h3>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-text"><strong>循环验证</strong> —— dry-run 失败后自动调整参数/公式并重试</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>多 LLM 交叉验证</strong> —— 多个模型独立提取 → 投票确认</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>图表数据提取</strong> —— 集成 OCR / chart-extraction 工具</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>公式 → LaTeX → SymPy 符号验证</strong> —— 更严谨的数学验证</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-text"><strong>论文间 Claim 交叉比对</strong> —— 识别矛盾结论或一致性趋势</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+    <h3>工作量总结</h3>
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="value">25</div>
+        <div class="label">Git Commits</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">2,674</div>
+        <div class="label">Python 行数</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">15</div>
+        <div class="label">单元测试</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">14</div>
+        <div class="label">论文处理</div>
+      </div>
+      <div class="metric-card" style="background:#f0fdf4; border-color:#dcfce7;">
+        <div class="value" style="color:#0f766e;">23</div>
+        <div class="label">Dry-Run 通过</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">8 / 8</div>
+</div>
+
+</body>
+</html>
